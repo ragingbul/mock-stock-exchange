@@ -11,6 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.config import get_settings
 from app.core.database import Base, get_db
+from app.exchange.book_registry import books
 from app.main import create_app
 
 
@@ -34,6 +35,7 @@ def _make_memory_engine():
 @pytest.fixture()
 def db_session() -> Session:
     get_settings.cache_clear()
+    books.clear()
     engine = _make_memory_engine()
     TestingSession = sessionmaker(bind=engine, autocommit=False, autoflush=False, future=True)
     Base.metadata.create_all(bind=engine)
@@ -44,12 +46,14 @@ def db_session() -> Session:
         session.close()
         Base.metadata.drop_all(bind=engine)
         engine.dispose()
+        books.clear()
         get_settings.cache_clear()
 
 
 @pytest.fixture()
 def client() -> TestClient:
     get_settings.cache_clear()
+    books.clear()
     engine = _make_memory_engine()
     TestingSession = sessionmaker(bind=engine, autocommit=False, autoflush=False, future=True)
     Base.metadata.create_all(bind=engine)
@@ -69,4 +73,5 @@ def client() -> TestClient:
     app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=engine)
     engine.dispose()
+    books.clear()
     get_settings.cache_clear()
