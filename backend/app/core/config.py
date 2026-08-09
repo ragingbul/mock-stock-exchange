@@ -6,6 +6,7 @@ behaviour without touching exchange mechanics.
 
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,12 +33,13 @@ class Settings(BaseSettings):
     # CORS — frontend origin(s)
     cors_origins: str = "http://localhost:3000"
 
-    # Database (PostgreSQL)
+    # Database (PostgreSQL by default; override with DATABASE_URL for tests/sqlite)
     postgres_user: str = "mse"
     postgres_password: str = "mse_dev_password"
     postgres_host: str = "localhost"
     postgres_port: int = 5432
     postgres_db: str = "mock_stock_exchange"
+    database_url_override: str | None = Field(default=None, validation_alias="DATABASE_URL")
 
     # Auth (simple event-auth; replaceable later)
     auth_secret_key: str = "change-me-in-production-phase-0"
@@ -51,7 +53,9 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
-        """SQLAlchemy async-compatible sync URL for PostgreSQL."""
+        """SQLAlchemy database URL."""
+        if self.database_url_override:
+            return self.database_url_override
         return (
             f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
