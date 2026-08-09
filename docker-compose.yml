@@ -1,0 +1,35 @@
+# Mock Stock Exchange — local development stack
+# Requires Docker Desktop. Postgres is the only required service for Phase 0+.
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: mse-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mse_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-mock_stock_exchange}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mse} -d ${POSTGRES_DB:-mock_stock_exchange}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Optional: run API in Docker once Docker is installed
+  # backend:
+  #   build: ./backend
+  #   container_name: mse-backend
+  #   env_file: .env
+  #   ports:
+  #     - "8000:8000"
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+
+volumes:
+  postgres_data:
