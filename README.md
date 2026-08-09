@@ -4,7 +4,9 @@ Web-based simulated multiplayer stock exchange for ~40–50 participants. Humans
 
 > Source of truth: [`docs/MASTER_PLAN.pdf`](docs/MASTER_PLAN.pdf)
 
-## Architecture (conceptual layers)
+**Repo:** https://github.com/ragingbul/mock-stock-exchange
+
+## Architecture
 
 ```
 Human / AI decision
@@ -20,154 +22,67 @@ Executed trade → Settlement
 Last traded price → Market data → Terminals (WebSocket)
 ```
 
-| Layer | Responsibility |
-|-------|----------------|
-| Human traders | Place market/limit orders via trading terminals |
-| AI traders | Strategies decide side, price, quantity — same order API |
-| News engine | Pre-loaded, manually rated events with decay |
-| Strategy engine | Converts signals into agent decisions |
-| Order gateway | Validates and accepts orders |
-| Order books | Bids/asks per stock, price-time priority |
-| Matching engine | Matches compatible orders (independent of AI/news/UI) |
-| Settlement | Atomic cash/share transfers |
-| Market data | LTP, OHLC, depth, volume |
-| Portfolio / P&L | Holdings, cash, equity |
-| Leaderboard | Configurable scoring |
-| Admin panel | Session, news, halts — not manual price setting |
-
-## Tech stack
-
-| Area | Choice |
-|------|--------|
-| Frontend | Next.js, TypeScript, React, Tailwind CSS |
-| Backend | Python, FastAPI, SQLAlchemy, Pydantic |
-| Database | PostgreSQL |
-| Realtime | WebSockets (Phase 8) |
-| Infra | Docker Compose (Postgres), Git / GitHub |
-
-## Repository layout
-
-```
-mock-stock-exchange/
-├── backend/                 # FastAPI application
-│   ├── app/
-│   │   ├── api/             # HTTP routes
-│   │   ├── core/            # Config, database
-│   │   ├── models/          # ORM (Phase 1+)
-│   │   ├── schemas/         # Pydantic (Phase 1+)
-│   │   ├── services/        # Domain services (later)
-│   │   ├── exchange/        # Order book + matching (Phase 3–5)
-│   │   └── main.py
-│   ├── tests/
-│   ├── Dockerfile
-│   └── requirements.txt
-├── frontend/                # Next.js trading / admin UI
-├── docs/                    # MASTER_PLAN and design notes
-├── docker-compose.yml       # PostgreSQL for local dev
-├── .env.example
-└── README.md
-```
-
-## Development phases
-
-| Phase | Focus | Status |
-|-------|-------|--------|
-| 0 | Project setup, health API, frontend skeleton | Done |
-| 1 | Database models & core entities | **Current** |
-| 2 | Order system | Pending |
-| 3 | Order books | Pending |
-| 4 | Matching engine | Pending |
-| 5 | Settlement & portfolio | Pending |
-| 6 | REST APIs | Pending |
-| 7 | Trading terminal | Pending |
-| 8 | WebSockets | Pending |
-| 9 | AI traders | Pending |
-| 10 | News engine | Pending |
-| 11 | Mathematical models | Pending |
-| 12 | Leaderboard | Pending |
-| 13 | Admin panel | Pending |
-| 14 | Load testing & polish | Pending |
-
-## Prerequisites
-
-- Python 3.12+ (3.13 works for Phase 0)
-- Node.js 20+ / npm
-- Docker Desktop (recommended for PostgreSQL)
-- Git
-
 ## Quick start
-
-### 1. Environment
 
 ```bash
 cp .env.example .env
-```
+# Without Docker, add:
+# DATABASE_URL=sqlite+pysqlite:///./backend/mse_dev.db
 
-### 2. PostgreSQL
-
-With Docker:
-
-```bash
-docker compose up -d db
-```
-
-Without Docker, point `POSTGRES_*` in `.env` at a local Postgres instance.
-
-### 3. Backend
-
-```bash
 cd backend
 python -m venv .venv
-
-# Windows
-.venv\Scripts\activate
-
-# macOS / Linux
-source .venv/bin/activate
-
+.\.venv\Scripts\activate          # Windows
 pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
+uvicorn app.main:app --reload --port 8000
 
-- Health: http://localhost:8000/api/v1/health  
-- Docs: http://localhost:8000/docs  
-
-### 4. Frontend
-
-```bash
+# other terminal
 cd frontend
 npm install
 npm run dev
 ```
 
-Open http://localhost:3000
+Open:
+- Terminal: http://localhost:3000/terminal
+- Admin: http://localhost:3000/admin
+- API docs: http://localhost:8000/docs
 
-## Phase 1 — Core entities
-
-Create traders and stocks (cash defaults to ₹10,00,000):
-
-```bash
-curl -X POST http://localhost:8000/api/v1/traders -H "Content-Type: application/json" -d "{\"name\":\"Trader A\"}"
-curl -X POST http://localhost:8000/api/v1/stocks/seed/defaults
-curl http://localhost:8000/api/v1/traders/1/portfolio
-```
-
-Without Docker, you can run the API against SQLite:
+Bootstrap a full market from admin **Bootstrap market**, or:
 
 ```bash
-# in repo-root .env
-DATABASE_URL=sqlite+pysqlite:///./backend/mse_dev.db
+curl -X POST http://localhost:8000/api/v1/admin/bootstrap
 ```
 
-## Design rules (do not violate)
+## Tests
 
-1. Matching engine must not depend on AI, news, sentiment, UI, or charts.
-2. AI traders use the same order interface as humans.
-3. News must not directly set last traded price.
-4. Admin should not normally manually set stock prices.
-5. Prefer configuration over hard-coded behaviour.
-6. Commit after each working phase; do not skip layers.
+```bash
+cd backend
+pytest
+```
 
-## License
+## Phases
 
-Private / educational use for a controlled college event simulation.
+| Phase | Focus | Status |
+|-------|-------|--------|
+| 0 | Foundation | Done |
+| 1 | Entities | Done |
+| 2 | Orders | Done |
+| 3 | Order books | Done |
+| 4 | Matching | Done |
+| 5 | Settlement | Done |
+| 6 | REST APIs | Done |
+| 7 | Trading terminal | Done |
+| 8 | WebSockets | Done |
+| 9 | AI traders | Done |
+| 10 | News engine | Done |
+| 11 | Market model | Done |
+| 12 | Leaderboard | Done |
+| 13 | Admin panel | Done |
+| 14 | Load/simulation tests | Done |
+
+## Key design rules
+
+1. Matching engine does not depend on AI, news, sentiment, UI, or charts.
+2. AI traders use the same order gateway as humans.
+3. News never directly sets last traded price (optional fair-value update only).
+4. Admin does not manually set stock prices.
+5. Configuration over hard-coding for weights, capital, circuits, ticks.
