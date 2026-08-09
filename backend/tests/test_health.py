@@ -1,4 +1,4 @@
-"""Phase 0 health endpoint tests."""
+"""Health endpoint tests."""
 
 from fastapi.testclient import TestClient
 
@@ -10,7 +10,7 @@ def test_root() -> None:
     response = client.get("/")
     assert response.status_code == 200
     body = response.json()
-    assert body["phase"] == 0
+    assert body["phase"] == 1
     assert "Mock Stock Exchange" in body["message"]
 
 
@@ -20,7 +20,7 @@ def test_health() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
-    assert body["phase"] == 0
+    assert body["phase"] == 1
 
 
 def test_ready_returns_status() -> None:
@@ -31,7 +31,7 @@ def test_ready_returns_status() -> None:
     body = response.json()
     assert body["status"] in {"ready", "degraded"}
     assert body["database"] in {"up", "down"}
-    assert body["phase"] == 0
+    assert body["phase"] == 1
 
 
 def test_settings_database_url() -> None:
