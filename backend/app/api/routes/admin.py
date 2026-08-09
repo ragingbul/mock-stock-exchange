@@ -1,0 +1,146 @@
+"""Admin / exchange control routes."""
+
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from app.ai import runner as ai_runner
+from app.core.config import get_settings
+from app.core.database import get_db
+from app.models import MarketSession, Stock
+from app.models.enums import MarketSessionStatus
+from app.realtime.ws_manager import manager
+from app.schemas.orders import HaltRequest, NewsCreate, NewsRead, SessionUpdate
+from app.services import leaderboard_service, news_service, order_service, stock_service
+from app.services.news_service import effective_impact
+
+router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+@router.post("/session/start")
+async def start_session(name: str = "Live Session", db: Session = Depends(get_db)) -> dict:
+    session = MarketSession(
+        name=name,
+        status=MarketSessionStatus.OPEN,
+        started_at=datetime.now(timezone.utc),
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    await manager.broadcast("MARKET_HALTED", {"halted": False, "status": "open"})
+    return {"id": session.id, "status": session.status.value}
+
+
+@router.post("/session/pause")
+async def pause_session(db: Session = Depends(get_db)) -> dict:
+    from sqlalchemy import select
+
+    session = db.scalar(select(MarketSession).order_by(MarketSession.id.desc()).limit(1))
+    if not session:
+        raise HTTPException(404, "no session")
+    session.status = MarketSessionStatus.PAUSED
+    db.commit()
+    await manager.broadcast("MARKET_HALTED", {"halted": True, "status": "paused"})
+    return {"id": session.id, "status": session.status.value}
+
+
+@router.post("/session/resume")
+async def resume_session(db: Session = Depends(get_db)) -> dict:
+    from sqlalchemy import select
+
+    session = db.scalar(select(MarketSession).order_by(MarketSession.id.desc()).limit(1))
+    if not session:
+        raise HTTPException(404, "no session")
+    session.status = MarketSessionStatus.OPEN
+    db.commit()
+    await manager.broadcast("MARKET_HALTED", {"halted": False, "status": "open"})
+    return {"id": session.id, "status": session.status.value}
+
+
+@router.post("/halt")
+async def halt(payload: HaltRequest, db: Session = Depends(get_db)) -> dict:
+    if payload.market_wide:
+        for stock in stock_service.list_stocks(db):
+            stock.is_halted = payload.halted
+        db.commit()
+    elif payload.stock_id is not None:
+        stock = db.get(Stock, payload.stock_id)
+        if not stock:
+            raise HTTPException(404, "stock not found")
+        stock.is_halted = payload.halted
+        db.commit()
+    else:
+        raise HTTPException(400, "stock_id or market_wide required")
+    await manager.broadcast("MARKET_HALTED", payload.model_dump())
+    return {"ok": True}
+
+
+@router.post("/news", response_model=NewsRead)
+def create_news(payload: NewsCreate, db: Session = Depends(get_db)) -> NewsRead:
+    event = news_service.create_news(db, **payload.model_dump())
+    return NewsRead.model_validate(event)
+
+
+@router.post("/news/{event_id}/release", response_model=NewsRead)
+async def release_news(event_id: int, db: Session = Depends(get_db)) -> NewsRead:
+    try:
+        event = news_service.release_news(db, event_id)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    read = NewsRead.model_validate(event)
+    read = read.model_copy(update={"effective_impact": effective_impact(event)})
+    await manager.broadcast(
+        "NEWS_RELEASED",
+        read.model_dump(mode="json"),
+    )
+    return read
+
+
+@router.get("/news", response_model=list[NewsRead])
+def list_news(db: Session = Depends(get_db)) -> list[NewsRead]:
+    out = []
+    for event in news_service.list_news(db):
+        read = NewsRead.model_validate(event)
+        out.append(read.model_copy(update={"effective_impact": effective_impact(event)}))
+    return out
+
+
+@router.get("/overview")
+def overview(db: Session = Depends(get_db)) -> dict:
+    settings = get_settings()
+    return {
+        "stocks": len(stock_service.list_stocks(db)),
+        "trades": len(order_service.list_trades(db, limit=10_000)),
+        "open_orders": len(order_service.list_orders(db, open_only=True)),
+        "starting_capital": settings.default_starting_capital,
+        "circuit_pct": settings.default_circuit_pct,
+        "leaderboard": leaderboard_service.compute_leaderboard(db)[:10],
+    }
+
+
+@router.post("/ai/seed")
+def seed_ai(db: Session = Depends(get_db)) -> dict:
+    return {"created": ai_runner.seed_default_agents(db)}
+
+
+@router.post("/ai/tick")
+def ai_tick(db: Session = Depends(get_db)) -> dict:
+    results = ai_runner.run_all_agents(db)
+    return {"actions": len(results), "results": results[:50]}
+
+
+@router.post("/bootstrap")
+def bootstrap(db: Session = Depends(get_db)) -> dict:
+    from app.seed.stocks import seed_default_stocks
+
+    stocks = seed_default_stocks(db)
+    agents = ai_runner.seed_default_agents(db)
+    session = MarketSession(
+        name="Bootstrapped Session",
+        status=MarketSessionStatus.OPEN,
+        started_at=datetime.now(timezone.utc),
+    )
+    db.add(session)
+    db.commit()
+    return {"stocks_created": stocks, "agents_created": agents, "session_id": session.id}

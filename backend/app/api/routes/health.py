@@ -1,4 +1,4 @@
-"""Health and readiness endpoints for Phase 0."""
+"""Health and readiness endpoints."""
 
 from fastapi import APIRouter
 
@@ -16,7 +16,7 @@ def health() -> dict:
         "status": "ok",
         "service": settings.app_name,
         "env": settings.app_env,
-        "phase": 1,
+        "phase": 14,
     }
 
 
@@ -27,5 +27,5 @@ def ready() -> dict:
     return {
         "status": "ready" if db_ok else "degraded",
         "database": "up" if db_ok else "down",
-        "phase": 1,
+        "phase": 14,
     }
