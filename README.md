@@ -72,8 +72,8 @@ mock-stock-exchange/
 
 | Phase | Focus | Status |
 |-------|-------|--------|
-| 0 | Project setup, health API, frontend skeleton | **Current** |
-| 1 | Database models & core entities | Pending |
+| 0 | Project setup, health API, frontend skeleton | Done |
+| 1 | Database models & core entities | **Current** |
 | 2 | Order system | Pending |
 | 3 | Order books | Pending |
 | 4 | Matching engine | Pending |
@@ -142,11 +142,21 @@ npm run dev
 
 Open http://localhost:3000
 
-### 5. Tests
+## Phase 1 — Core entities
+
+Create traders and stocks (cash defaults to ₹10,00,000):
 
 ```bash
-cd backend
-pytest
+curl -X POST http://localhost:8000/api/v1/traders -H "Content-Type: application/json" -d "{\"name\":\"Trader A\"}"
+curl -X POST http://localhost:8000/api/v1/stocks/seed/defaults
+curl http://localhost:8000/api/v1/traders/1/portfolio
+```
+
+Without Docker, you can run the API against SQLite:
+
+```bash
+# in repo-root .env
+DATABASE_URL=sqlite+pysqlite:///./backend/mse_dev.db
 ```
 
 ## Design rules (do not violate)
