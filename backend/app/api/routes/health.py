@@ -16,7 +16,7 @@ def health() -> dict:
         "status": "ok",
         "service": settings.app_name,
         "env": settings.app_env,
-        "phase": 0,
+        "phase": 1,
     }
 
 
@@ -27,5 +27,5 @@ def ready() -> dict:
     return {
         "status": "ready" if db_ok else "degraded",
         "database": "up" if db_ok else "down",
-        "phase": 0,
+        "phase": 1,
     }
