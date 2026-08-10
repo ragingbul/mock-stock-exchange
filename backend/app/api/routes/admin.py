@@ -16,6 +16,7 @@ from app.models import Order, Trade, Trader
 from app.realtime.ws_manager import manager
 from app.schemas.orders import HaltRequest, NewsCreate, NewsRead, SessionUpdate
 from app.services import news_service, order_service, stock_service
+from app.services.liquidity_service import seed_all_liquidity
 from app.services.news_service import effective_impact
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -180,13 +181,22 @@ def ai_tick(db: Session = Depends(get_db)) -> dict:
 def bootstrap(db: Session = Depends(get_db)) -> dict:
     from app.seed.stocks import seed_default_stocks
 
-    stocks = seed_default_stocks(db)
-    agents = ai_runner.seed_default_agents(db)
     session = MarketSession(
         name="Bootstrapped Session",
         status=MarketSessionStatus.OPEN,
         started_at=datetime.now(timezone.utc),
     )
     db.add(session)
+    db.flush()
+
+    stocks = seed_default_stocks(db)
+    agents = ai_runner.seed_default_agents(db)
+    liquidity_quotes = seed_all_liquidity(db)
     db.commit()
-    return {"stocks_created": stocks, "agents_created": agents, "session_id": session.id}
+    db.refresh(session)
+    return {
+        "stocks_created": stocks,
+        "agents_created": agents,
+        "liquidity_quotes": liquidity_quotes,
+        "session_id": session.id,
+    }

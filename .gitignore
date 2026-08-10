@@ -45,6 +45,12 @@ pnpm-debug.log*
 *.swo
 .DS_Store
 Thumbs.db
+
+# Local SQLite dev databases
+*.db
+*.db-shm
+*.db-wal
+debug-*.log
 Desktop.ini
 
 # Docker / local data

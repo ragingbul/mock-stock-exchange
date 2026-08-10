@@ -22,6 +22,15 @@ Executed trade → Settlement
 Last traded price → Market data → Terminals (WebSocket)
 ```
 
+## Features
+
+- **Trading terminal** — minimal black/white UI with **BUY NOW** / **SELL NOW** market orders, live price chart from executed trades, portfolio strip, news feed, and **leaderboard**
+- **Advanced mode** — limit orders, order book, and open-order management (full matching engine unchanged)
+- **Admin panel** — bootstrap market, session control (start / pause / resume), AI ticks, news release, halt controls, live status clock, and **leaderboard**
+- **AI traders** — same order gateway as humans; strategies react to news and book state
+- **Leaderboard** — human traders ranked by return % (`GET /api/v1/leaderboard`)
+- **Market liquidity** — market-maker quotes so solo testers and events get immediate fills when the book is thin
+
 ## Quick start
 
 ```bash
@@ -33,7 +42,7 @@ cd backend
 python -m venv .venv
 .\.venv\Scripts\activate          # Windows
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 # other terminal
 cd frontend
@@ -42,15 +51,42 @@ npm run dev
 ```
 
 Open:
-- Terminal: http://localhost:3000/terminal
-- Admin: http://localhost:3000/admin
-- API docs: http://localhost:8000/docs
+
+| Page | URL |
+|------|-----|
+| Trading terminal | http://localhost:3000/terminal |
+| Admin | http://localhost:3000/admin |
+| API docs | http://localhost:8000/docs |
+
+### Host an event (admin)
+
+1. Open **Admin** → **Bootstrap market** (seeds stocks, AI agents, liquidity, opens session).
+2. Click **Run AI tick** a few times to seed activity (or use the demo script below).
+3. Optional: release news from the admin form.
+4. Share the terminal link with participants (`http://<your-ip>:3000/terminal` on the same Wi‑Fi).
+
+### Trade as a participant
+
+1. Open **Terminal** → enter your name → **Start**.
+2. Pick a stock, set quantity, **BUY NOW** or **SELL NOW** → confirm.
+3. Watch the chart, portfolio, news, and leaderboard update live.
 
 Bootstrap a full market from admin **Bootstrap market**, or:
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/admin/bootstrap
 ```
+
+### Multi-trader demo (realistic charts & leaderboard)
+
+With the API running, simulate ~24 mock traders, AI ticks, mixed orders, and news:
+
+```bash
+cd backend
+.\.venv\Scripts\python.exe scripts/run_demo_traders.py
+```
+
+Then refresh the terminal — charts and leaderboard reflect live multi-participant trading.
 
 ## Tests
 
@@ -89,10 +125,14 @@ pytest
 
 ## Contributors
 
+Ordered list of project contributors:
+
 1. **Raghav Singh** — [GitHub](https://github.com/ragingbul) · [LinkedIn](https://www.linkedin.com/in/raghav-singh-b24064279)
 2. **Soumil Tiwary** — [GitHub](https://github.com/S0UMIL) · [LinkedIn](https://www.linkedin.com/in/soumiltiwary)
 3. **Ishan Dhawan** — [GitHub](https://github.com/ishan1818) · [LinkedIn](https://www.linkedin.com/in/ishan-dhawan-130a17351)
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for the full text.
+
+Copyright (c) 2026 Mock Stock Exchange Contributors

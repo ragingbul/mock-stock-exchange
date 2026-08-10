@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Leaderboard, type LeaderboardRow } from "@/components/Leaderboard";
 import { apiGet, apiPost, apiUrl, getApiBaseUrl } from "@/lib/api";
 
 type MarketStatus = {
@@ -35,19 +36,27 @@ export default function AdminPage() {
   const [tickers, setTickers] = useState("TECHNOVA");
   const [direction, setDirection] = useState(1);
   const [impact, setImpact] = useState("0.75");
+  const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(true);
 
   const refreshOverview = useCallback(async (silent = false) => {
     try {
       await apiGet("/health");
       setApiOk(true);
-      const ov = await apiGet<Record<string, unknown>>("/admin/overview");
+      const [ov, lb] = await Promise.all([
+        apiGet<Record<string, unknown>>("/admin/overview"),
+        apiGet<LeaderboardRow[]>("/leaderboard"),
+      ]);
       setOverview(ov);
       setMarketStatus(ov as MarketStatus);
+      setLeaderboard(lb);
+      setLeaderboardLoading(false);
       if (!silent) setMsg("");
     } catch (e) {
       setApiOk(false);
       setOverview(null);
       setMarketStatus(null);
+      setLeaderboardLoading(false);
       if (!silent) {
         setMsg(e instanceof Error ? e.message : "Cannot reach API");
       }
@@ -298,6 +307,21 @@ export default function AdminPage() {
         >
           {activeAction === "News" ? "Releasing news…" : "Create & release"}
         </button>
+      </section>
+
+      <section className="mt-8 border border-line bg-panel p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-mono text-sm uppercase text-muted">Leaderboard</h2>
+          <p className="font-mono text-xs text-muted">
+            {leaderboard.length} human traders · ranked by return %
+          </p>
+        </div>
+        <Leaderboard
+          rows={leaderboard}
+          variant="admin"
+          loading={leaderboardLoading}
+          maxRows={20}
+        />
       </section>
 
       <section className="mt-8 border border-line bg-panel p-4">
