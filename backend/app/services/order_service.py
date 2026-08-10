@@ -14,6 +14,7 @@ from app.exchange.settlement import SettlementError, settle_fill
 from app.models import Holding, Order, OrderSide, OrderStatus, OrderType, Stock, Trade, Trader
 from app.models.enums import MarketSessionStatus
 from app.models.market_session import MarketSession
+from app.services import liquidity_service
 
 
 class OrderGatewayError(Exception):
@@ -109,7 +110,12 @@ def submit_order(
         price = _quantize_price(price, Decimal(stock.tick_size))
 
     if side == OrderSide.BUY:
-        est_price = price if order_type == OrderType.LIMIT else Decimal(stock.last_traded_price)
+        book = books.get(stock_id)
+        if order_type == OrderType.MARKET:
+            best_ask = book.best_ask()
+            est_price = best_ask.price if best_ask else Decimal(stock.last_traded_price)
+        else:
+            est_price = price if order_type == OrderType.LIMIT else Decimal(stock.last_traded_price)
         if est_price and trader.cash < est_price * quantity:
             order = reject("insufficient cash")
             raise OrderGatewayError("insufficient cash", rejected_order=order)
@@ -119,6 +125,11 @@ def submit_order(
             raise OrderGatewayError(
                 "insufficient holdings (short selling disabled)", rejected_order=order
             )
+
+    if order_type == OrderType.MARKET:
+        liquidity_service.ensure_liquidity_for_market_order(
+            db, stock, side, trader_id, quantity
+        )
 
     order = Order(
         trader_id=trader_id,

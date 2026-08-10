@@ -7,7 +7,9 @@ from app.core.database import get_db
 from app.exchange.book_registry import books
 from app.realtime.ws_manager import manager
 from app.schemas.orders import OrderBookRead, OrderCreate, OrderRead, TradeRead
+from app.models import Stock
 from app.services import order_service
+from app.services.execution_summary import build_execution_summary, human_reason
 from app.services.order_service import OrderGatewayError
 
 router = APIRouter(tags=["orders"])
@@ -28,15 +30,21 @@ async def create_order(payload: OrderCreate, db: Session = Depends(get_db)) -> d
         )
     except OrderGatewayError as exc:
         if exc.rejected_order is not None:
+            stock = db.get(Stock, exc.rejected_order.stock_id)
+            summary = build_execution_summary(exc.rejected_order, [], stock)
             return {
                 "order": OrderRead.model_validate(exc.rejected_order).model_dump(mode="json"),
                 "trades": [],
                 "rejected": True,
+                "executed": False,
                 "detail": str(exc),
+                "execution_summary": summary,
             }
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=human_reason(str(exc))) from exc
 
+    stock = db.get(Stock, order.stock_id)
     trade_payload = [TradeRead.model_validate(t).model_dump(mode="json") for t in trades]
+    summary = build_execution_summary(order, trades, stock)
     await manager.broadcast(
         "TRADE_EXECUTED" if trades else "ORDER_BOOK_UPDATED",
         {
@@ -54,6 +62,8 @@ async def create_order(payload: OrderCreate, db: Session = Depends(get_db)) -> d
         "order": OrderRead.model_validate(order).model_dump(mode="json"),
         "trades": trade_payload,
         "rejected": False,
+        "executed": summary["executed"],
+        "execution_summary": summary,
     }
 
 

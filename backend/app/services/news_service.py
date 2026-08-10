@@ -9,6 +9,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models import NewsEvent, Stock
 from app.models.enums import Sector
 
@@ -25,9 +26,9 @@ def effective_impact(event: NewsEvent, *, now: datetime | None = None) -> Decima
     i0 = float(event.impact) * float(event.confidence) * float(event.direction)
     lam = float(event.decay_rate)
     value = i0 * math.exp(-lam * elapsed_min)
-    # Hard stop after duration window
+    # Tail after headline window — still meaningful for multi-news events
     if elapsed_min > event.duration_minutes:
-        value *= 0.05
+        value *= float(get_settings().news_decay_tail_factor)
     return Decimal(str(round(value, 6)))
 
 
@@ -52,15 +53,19 @@ def release_news(db: Session, event_id: int, *, now: datetime | None = None) -> 
         tickers = [t.strip().upper() for t in event.affected_tickers.split(",") if t.strip()]
         sectors = [s.strip().lower() for s in event.affected_sectors.split(",") if s.strip()]
         stocks = list(db.scalars(select(Stock)).all())
-        factor = Decimal("1") + (Decimal(event.fundamental_impact_pct) / Decimal("100"))
+        settings = get_settings()
+        pct = Decimal(event.fundamental_impact_pct) * Decimal(str(settings.news_fundamental_multiplier))
+        factor = Decimal("1") + (pct / Decimal("100"))
         for stock in stocks:
             apply = event.market_wide
             if stock.ticker in tickers:
                 apply = True
-            if stock.sector.value in sectors or (
-                sectors and stock.sector == Sector(sectors[0]) if sectors[0] in Sector._value2member_map_ else False
-            ):
+            if stock.sector.value in sectors:
                 apply = True
+            elif sectors:
+                first = sectors[0]
+                if first in Sector._value2member_map_ and stock.sector == Sector(first):
+                    apply = True
             if apply:
                 stock.fair_value = (stock.fair_value * factor).quantize(Decimal("0.0001"))
 
@@ -77,16 +82,18 @@ def list_news(db: Session, *, released_only: bool = False) -> list[NewsEvent]:
 
 
 def news_pressure_for_ticker(db: Session, ticker: str, *, now: datetime | None = None) -> Decimal:
-    """Normalized news component N in [-1, 1] for a ticker."""
+    """Normalized news pressure for a ticker (amplified for event volatility)."""
+    settings = get_settings()
     events = list_news(db, released_only=True)
     total = Decimal("0")
     for event in events:
         tickers = [t.strip().upper() for t in event.affected_tickers.split(",") if t.strip()]
         if event.market_wide or ticker.upper() in tickers:
             total += effective_impact(event, now=now)
-    # Clamp
-    if total > 1:
-        return Decimal("1")
-    if total < -1:
-        return Decimal("-1")
+    total *= Decimal(str(settings.news_pressure_amplifier))
+    cap = Decimal(str(settings.news_pressure_cap))
+    if total > cap:
+        return cap
+    if total < -cap:
+        return -cap
     return total

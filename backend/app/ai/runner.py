@@ -21,8 +21,8 @@ from app.models import AIAgent, Holding, OrderSide, OrderType, Stock, Trader, Tr
 from app.schemas import TraderCreate
 from app.services.trader_service import create_trader
 from app.services import news_service, order_service
+from app.services.market_intensity import strategy_configs
 from app.services.market_model import compute_signals
-
 
 
 STRATEGIES: dict[str, type[TraderStrategy]] = {
@@ -43,6 +43,18 @@ def build_strategy(name: str, config: dict | None = None) -> TraderStrategy:
     return cls(config)
 
 
+def sync_intensity_configs(db: Session) -> int:
+    """Apply volatility presets to all AI agents (bootstrap + re-seed)."""
+    configs = strategy_configs()
+    updated = 0
+    for agent in db.scalars(select(AIAgent)).all():
+        if agent.strategy in configs:
+            agent.config_json = json.dumps(configs[agent.strategy])
+            updated += 1
+    db.commit()
+    return updated
+
+
 def register_ai_agent(
     db: Session,
     *,
@@ -57,10 +69,12 @@ def register_ai_agent(
         db,
         TraderCreate(name=name, trader_type=TraderType.AI, starting_capital=capital),
     )
+    preset = strategy_configs().get(strategy, {})
+    merged = {**preset, **(config or {})}
     agent = AIAgent(
         trader_id=trader.id,
         strategy=strategy,
-        config_json=json.dumps(config or {}),
+        config_json=json.dumps(merged),
         capital=trader.starting_capital,
     )
     db.add(agent)
@@ -76,6 +90,12 @@ def _position(db: Session, trader_id: int, stock_id: int) -> int:
     return h.quantity if h else 0
 
 
+def _book_pressure(book) -> tuple[float, float]:
+    buy_notional = sum(float(e.price) * e.quantity for e in book.bids[:8])
+    sell_notional = sum(float(e.price) * e.quantity for e in book.asks[:8])
+    return buy_notional, sell_notional
+
+
 def run_agent_once(db: Session, agent: AIAgent, stock: Stock) -> dict:
     trader = db.get(Trader, agent.trader_id)
     if trader is None or not agent.is_enabled:
@@ -88,18 +108,24 @@ def run_agent_once(db: Session, agent: AIAgent, stock: Stock) -> dict:
     bid = book.best_bid().price if book.best_bid() else None
     ask = book.best_ask().price if book.best_ask() else None
     news = float(news_service.news_pressure_for_ticker(db, stock.ticker))
+    buy_notional, sell_notional = _book_pressure(book)
+    sentiment = max(-1.0, min(1.0, news * 0.6))
     signals = compute_signals(
-        buy_notional=0,
-        sell_notional=0,
-        sentiment=0.0,
+        buy_notional=buy_notional,
+        sell_notional=sell_notional,
+        sentiment=sentiment,
         news=news,
-        ai_pressure=0.0,
+        ai_pressure=news * 0.5,
         fair_value=stock.fair_value,
         last_price=stock.last_traded_price,
         reference_price=stock.fair_value,
     )
+    ltp = float(stock.last_traded_price)
+    fv = float(stock.fair_value) or float(stock.starting_price)
     prev = float(stock.previous_close) or float(stock.starting_price)
-    recent_return = (float(stock.last_traded_price) - prev) / prev if prev else 0.0
+    return_vs_fv = (ltp - fv) / fv if fv else 0.0
+    return_vs_prev = (ltp - prev) / prev if prev else 0.0
+    recent_return = return_vs_fv * 0.75 + return_vs_prev * 0.25
     view = MarketView(
         ticker=stock.ticker,
         stock_id=stock.id,
@@ -161,4 +187,5 @@ def seed_default_agents(db: Session) -> int:
             capital=Decimal("2000000"),
         )
         created += 1
+    sync_intensity_configs(db)
     return created

@@ -51,6 +51,18 @@ class Settings(BaseSettings):
     default_circuit_pct: float = 0.10
     random_seed: int = 42
 
+    # Event volatility — amplify news/AI reactions for larger swings
+    market_intensity_multiplier: float = 3.0
+    news_pressure_amplifier: float = 2.5
+    news_pressure_cap: float = 3.0
+    news_fundamental_multiplier: float = 2.0
+    news_decay_tail_factor: float = 0.35
+    mm_spread_bps: float = 140.0
+    mm_quote_size: int = 35
+    mm_min_book_depth: int = 20
+    market_noise_std: float = 0.08
+    market_news_weight: float = 0.45
+
     @property
     def database_url(self) -> str:
         """SQLAlchemy database URL."""

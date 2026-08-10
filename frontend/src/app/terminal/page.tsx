@@ -1,15 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Leaderboard, type LeaderboardRow } from "@/components/Leaderboard";
 import { apiDelete, apiGet, apiPost, wsUrl } from "@/lib/api";
+
+const UP = "#22c55e";
+const DOWN = "#ef4444";
 
 type Stock = {
   id: number;
@@ -20,18 +17,12 @@ type Stock = {
 };
 
 type Portfolio = {
-  trader_id: number;
-  name: string;
   cash: string;
   portfolio_value: string;
   total_pnl: string;
-  realized_pnl: string;
-  unrealized_pnl: string;
   holdings: Array<{
     ticker: string | null;
     quantity: number;
-    avg_cost: string;
-    market_price: string | null;
     unrealized_pnl: string | null;
   }>;
 };
@@ -45,7 +36,34 @@ type Book = {
 };
 
 type News = { id: number; title: string; description: string; effective_impact?: string };
-type Leader = { rank: number; name: string; return_pct: string; portfolio_value: string };
+
+type ExecutionSummary = {
+  status: string;
+  executed: boolean;
+  filled_quantity: number;
+  average_price: string | null;
+  total_notional: string | null;
+  ticker: string;
+  side: string;
+  message: string;
+};
+
+function num(v: string | number | null | undefined): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function signClass(value: string | number | null | undefined): string {
+  const n = num(value);
+  if (n > 0) return "text-[#22c55e]";
+  if (n < 0) return "text-[#ef4444]";
+  return "text-white";
+}
+
+function fmtPct(value: string | null | undefined): string {
+  const n = num(value);
+  return `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
+}
 
 export default function TerminalPage() {
   const [traderId, setTraderId] = useState<number | null>(null);
@@ -55,35 +73,43 @@ export default function TerminalPage() {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [book, setBook] = useState<Book | null>(null);
   const [news, setNews] = useState<News[]>([]);
-  const [leaders, setLeaders] = useState<Leader[]>([]);
   const [orders, setOrders] = useState<Array<Record<string, unknown>>>([]);
   const [trades, setTrades] = useState<Array<Record<string, unknown>>>([]);
-  const [side, setSide] = useState<"buy" | "sell">("buy");
-  const [orderType, setOrderType] = useState<"limit" | "market">("limit");
   const [qty, setQty] = useState(10);
-  const [price, setPrice] = useState("100");
-  const [status, setStatus] = useState("IDLE");
+  const [status, setStatus] = useState("—");
   const [priceSeries, setPriceSeries] = useState<Array<{ t: string; px: number }>>([]);
   const [error, setError] = useState<string | null>(null);
+  const [resultMsg, setResultMsg] = useState<string | null>(null);
+  const [confirmSide, setConfirmSide] = useState<"buy" | "sell" | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [limitPrice, setLimitPrice] = useState("100");
+  const [limitSide, setLimitSide] = useState<"buy" | "sell">("buy");
+  const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
 
   const selected = useMemo(
     () => stocks.find((s) => s.id === selectedId) ?? null,
-    [stocks, selectedId]
+    [stocks, selectedId],
   );
+
+  const chartStroke = useMemo(() => {
+    if (priceSeries.length < 2) return UP;
+    return priceSeries[priceSeries.length - 1].px >= priceSeries[0].px ? UP : DOWN;
+  }, [priceSeries]);
 
   const refresh = useCallback(async () => {
     try {
-      const [s, n, l] = await Promise.all([
+      const [s, n, lb] = await Promise.all([
         apiGet<Stock[]>("/stocks"),
         apiGet<News[]>("/news"),
-        apiGet<Leader[]>("/leaderboard"),
+        apiGet<LeaderboardRow[]>("/leaderboard"),
       ]);
       setStocks(s);
       setNews(n);
-      setLeaders(l);
+      setLeaderboard(lb);
       if (!selectedId && s.length) {
         setSelectedId(s[0].id);
-        setPrice(s[0].last_traded_price);
+        setLimitPrice(s[0].last_traded_price);
       }
       if (traderId) {
         const [p, o, t] = await Promise.all([
@@ -96,29 +122,45 @@ export default function TerminalPage() {
         setTrades(t);
       }
       if (selectedId) {
-        const b = await apiGet<Book>(`/market/${selectedId}/book`);
+        const [b, stockTrades] = await Promise.all([
+          apiGet<Book>(`/market/${selectedId}/book`),
+          apiGet<Array<{ id: number; price: string; executed_at?: string }>>(
+            `/trades?stock_id=${selectedId}&limit=120`,
+          ),
+        ]);
         setBook(b);
+        const stock = s.find((x) => x.id === selectedId);
+        const sorted = [...stockTrades].sort((a, b) =>
+          String(a.executed_at ?? a.id).localeCompare(String(b.executed_at ?? b.id)),
+        );
+        if (sorted.length > 0) {
+          setPriceSeries(
+            sorted.map((tr) => ({
+              t: tr.executed_at
+                ? new Date(tr.executed_at).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  })
+                : `#${tr.id}`,
+              px: num(tr.price),
+            })),
+          );
+        } else if (stock) {
+          setPriceSeries([{ t: "now", px: num(stock.last_traded_price) }]);
+        }
       }
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "refresh failed");
+      setError(e instanceof Error ? e.message : "Could not load market data");
     }
   }, [selectedId, traderId]);
 
   useEffect(() => {
     refresh();
-    const id = window.setInterval(refresh, 4000);
+    const id = window.setInterval(refresh, 5000);
     return () => window.clearInterval(id);
   }, [refresh]);
-
-  useEffect(() => {
-    if (!selected) return;
-    setPriceSeries((prev) => {
-      const px = Number(selected.last_traded_price);
-      const next = [...prev, { t: new Date().toLocaleTimeString(), px }];
-      return next.slice(-40);
-    });
-  }, [selected?.last_traded_price, selected?.id]);
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -142,15 +184,20 @@ export default function TerminalPage() {
         }
       };
       ws.onopen = () => setStatus("LIVE");
-      ws.onclose = () => setStatus("WS CLOSED");
+      ws.onclose = () => setStatus("OFF");
     } catch {
-      setStatus("WS OFF");
+      setStatus("OFF");
     }
     return () => ws?.close();
   }, [refresh]);
 
+  useEffect(() => {
+    const saved = localStorage.getItem("mse_trader_id");
+    if (saved) setTraderId(Number(saved));
+  }, []);
+
   async function join() {
-    const created = await apiPost<{ id: number; name: string }>("/traders", {
+    const created = await apiPost<{ id: number }>("/traders", {
       name: traderName || "Trader",
     });
     setTraderId(created.id);
@@ -158,22 +205,74 @@ export default function TerminalPage() {
     await refresh();
   }
 
-  useEffect(() => {
-    const saved = localStorage.getItem("mse_trader_id");
-    if (saved) setTraderId(Number(saved));
-  }, []);
-
-  async function submitOrder() {
+  async function executeMarketOrder(side: "buy" | "sell") {
     if (!traderId || !selectedId) return;
-    await apiPost("/orders", {
-      trader_id: traderId,
-      stock_id: selectedId,
-      side,
-      order_type: orderType,
-      quantity: qty,
-      price: orderType === "limit" ? price : null,
-    });
-    await refresh();
+    setSubmitting(true);
+    setError(null);
+    setResultMsg(null);
+    try {
+      const res = await apiPost<{
+        rejected?: boolean;
+        executed?: boolean;
+        execution_summary?: ExecutionSummary;
+        detail?: string;
+      }>("/orders", {
+        trader_id: traderId,
+        stock_id: selectedId,
+        side,
+        order_type: "market",
+        quantity: qty,
+        price: null,
+      });
+      const summary = res.execution_summary;
+      if (summary) {
+        setResultMsg(summary.message);
+        if (!summary.executed) setError(summary.message);
+      } else if (res.rejected) {
+        setError(res.detail ?? "Order could not be completed");
+      }
+      setConfirmSide(null);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Order failed");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function submitLimitOrder() {
+    if (!traderId || !selectedId) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await apiPost<{
+        rejected?: boolean;
+        execution_summary?: ExecutionSummary;
+        detail?: string;
+      }>("/orders", {
+        trader_id: traderId,
+        stock_id: selectedId,
+        side: limitSide,
+        order_type: "limit",
+        quantity: qty,
+        price: limitPrice,
+      });
+      if (res.execution_summary) {
+        setResultMsg(res.execution_summary.message);
+        if (!res.execution_summary.executed && res.rejected) {
+          setError(res.execution_summary.message);
+        }
+      } else if (res.rejected) {
+        setError(res.detail ?? "Limit order rejected");
+      } else {
+        setResultMsg("Limit order placed on the book");
+      }
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Limit order failed");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function cancelOrder(id: number) {
@@ -181,254 +280,305 @@ export default function TerminalPage() {
     await refresh();
   }
 
+  const panel = "border border-white/15";
+  const inputCls =
+    "w-full border border-white/25 bg-black px-2 py-2 text-white outline-none focus:border-white";
+
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-line px-4 py-3">
-        <div>
-          <p className="font-mono text-xs uppercase tracking-[0.18em] text-accent">
-            Mock Stock Exchange
-          </p>
-          <h1 className="text-lg font-semibold">Trading Terminal</h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-4 font-mono text-xs">
-          <span>STATUS {status}</span>
-          <span>VALUE {portfolio?.portfolio_value ?? "—"}</span>
-          <span>CASH {portfolio?.cash ?? "—"}</span>
-          <span>P&L {portfolio?.total_pnl ?? "—"}</span>
-          <a className="text-accent underline" href="/admin">
-            Admin
-          </a>
-        </div>
+    <div className="min-h-screen bg-black font-mono text-sm text-white">
+      <header className={`${panel} flex flex-wrap items-center justify-between gap-2 border-x-0 border-t-0 px-4 py-2 text-xs`}>
+        <span>MSE · {status}</span>
+        <a className="underline" href="/admin">Admin</a>
       </header>
 
       {!traderId ? (
-        <div className="mx-auto max-w-md px-4 py-16">
-          <h2 className="text-xl font-semibold">Join session</h2>
-          <input
-            className="mt-4 w-full border border-line bg-panel px-3 py-2"
-            value={traderName}
-            onChange={(e) => setTraderName(e.target.value)}
-            placeholder="Display name"
-          />
+        <div className="mx-auto max-w-sm px-4 py-16">
+          <p className="text-white/50">Enter your name to start trading</p>
+          <input className={`${inputCls} mt-3`} value={traderName} onChange={(e) => setTraderName(e.target.value)} />
           <button
-            className="mt-4 bg-accent px-4 py-2 font-mono text-sm text-black"
+            type="button"
+            className="mt-4 w-full border border-[#22c55e] py-2 text-[#22c55e]"
             onClick={join}
           >
-            Create trader
+            Start
           </button>
-          {error && <p className="mt-3 text-sm text-warn">{error}</p>}
+          {error && <p className="mt-3 text-[#ef4444]">{error}</p>}
         </div>
       ) : (
-        <div className="grid gap-3 p-3 lg:grid-cols-[220px_1fr_280px]">
-          <aside className="border border-line bg-panel p-3">
-            <h2 className="font-mono text-xs uppercase text-muted">Watchlist</h2>
-            <ul className="mt-2 space-y-1">
-              {stocks.map((s) => (
-                <li key={s.id}>
-                  <button
-                    className={`w-full px-2 py-1 text-left font-mono text-sm ${
-                      selectedId === s.id ? "bg-line" : ""
-                    }`}
-                    onClick={() => {
-                      setSelectedId(s.id);
-                      setPrice(s.last_traded_price);
-                    }}
-                  >
-                    <div className="flex justify-between">
-                      <span>{s.ticker}</span>
-                      <span>{Number(s.last_traded_price).toFixed(2)}</span>
-                    </div>
-                    <div className="text-xs text-muted">
-                      {s.percent_change ?? "0"}%
-                    </div>
-                  </button>
+        <div className="mx-auto max-w-3xl px-4 py-4">
+          {/* Stock picker */}
+          <div className="flex flex-wrap gap-1">
+            {stocks.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                className={`px-3 py-1 text-xs ${
+                  selectedId === s.id ? "bg-white text-black" : "border border-white/20"
+                }`}
+                onClick={() => {
+                  setSelectedId(s.id);
+                  setLimitPrice(s.last_traded_price);
+                  setPriceSeries([]);
+                }}
+              >
+                {s.ticker}
+              </button>
+            ))}
+          </div>
+
+          {/* Price header */}
+          <div className="mt-6 flex items-end justify-between">
+            <div>
+              <h1 className="text-xl">{selected?.company_name ?? selected?.ticker ?? "—"}</h1>
+              <p className="text-xs text-white/50">{selected?.ticker}</p>
+            </div>
+            <div className="text-right">
+              <p className={`text-3xl tabular-nums ${signClass(selected?.percent_change)}`}>
+                {selected ? num(selected.last_traded_price).toFixed(2) : "—"}
+              </p>
+              <p className={`text-sm ${signClass(selected?.percent_change)}`}>
+                {selected ? fmtPct(selected.percent_change) : "—"}
+              </p>
+            </div>
+          </div>
+
+          {/* Chart */}
+            <div className="mt-4 h-40 border border-white/15 p-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={priceSeries}>
+                  <XAxis dataKey="t" hide />
+                  <YAxis
+                    domain={["auto", "auto"]}
+                    width={52}
+                    tick={{ fill: "#888", fontSize: 10 }}
+                    tickFormatter={(v) => Number(v).toFixed(2)}
+                  />
+                <Tooltip
+                  contentStyle={{ background: "#000", border: "1px solid #333", fontSize: 11 }}
+                />
+                <Line type="monotone" dataKey="px" stroke={chartStroke} strokeWidth={1.5} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Portfolio strip */}
+          <div className="mt-4 grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
+            <div className={`${panel} p-2`}>
+              <p className="text-white/40">Available cash</p>
+              <p className="mt-1">{portfolio?.cash ?? "—"}</p>
+            </div>
+            <div className={`${panel} p-2`}>
+              <p className="text-white/40">Portfolio value</p>
+              <p className="mt-1">{portfolio?.portfolio_value ?? "—"}</p>
+            </div>
+            <div className={`${panel} p-2`}>
+              <p className="text-white/40">Current profit/loss</p>
+              <p className={`mt-1 ${signClass(portfolio?.total_pnl)}`}>{portfolio?.total_pnl ?? "—"}</p>
+            </div>
+            <div className={`${panel} p-2`}>
+              <p className="text-white/40">Holdings</p>
+              <p className="mt-1 truncate">
+                {(portfolio?.holdings ?? [])
+                  .filter((h) => h.quantity > 0)
+                  .map((h) => `${h.ticker} ${h.quantity}`)
+                  .join(" · ") || "None"}
+              </p>
+            </div>
+          </div>
+
+          {/* Trade */}
+          <div className={`${panel} mt-4 p-4`}>
+            <label className="text-xs text-white/40">Quantity</label>
+            <input
+              type="number"
+              className={`${inputCls} mt-1`}
+              value={qty}
+              min={1}
+              onChange={(e) => setQty(Number(e.target.value))}
+            />
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={submitting}
+                className="bg-[#22c55e] py-3 text-black disabled:opacity-40"
+                onClick={() => setConfirmSide("buy")}
+              >
+                BUY NOW
+              </button>
+              <button
+                type="button"
+                disabled={submitting}
+                className="bg-[#ef4444] py-3 text-black disabled:opacity-40"
+                onClick={() => setConfirmSide("sell")}
+              >
+                SELL NOW
+              </button>
+            </div>
+          </div>
+
+          {resultMsg && (
+            <pre className="mt-4 whitespace-pre-wrap border border-white/20 p-3 text-xs text-white/90">
+              {resultMsg}
+            </pre>
+          )}
+          {error && <p className="mt-2 text-xs text-[#ef4444]">{error}</p>}
+
+          {/* Recent trades */}
+          <div className={`${panel} mt-4 p-3`}>
+            <p className="text-xs text-white/40">Your recent trades</p>
+            <ul className="mt-2 space-y-1 text-xs">
+              {trades.slice(0, 8).map((t) => (
+                <li key={String(t.id)}>{String(t.quantity)} shares @ ₹{String(t.price)}</li>
+              ))}
+              {!trades.length && <li className="text-white/30">No trades yet</li>}
+            </ul>
+          </div>
+
+          {/* News */}
+          <div className={`${panel} mt-4 p-3`}>
+            <p className="text-xs text-white/40">News</p>
+            <ul className="mt-2 space-y-2 text-xs">
+              {news.slice(0, 5).map((n) => (
+                <li key={n.id}>
+                  <p className={signClass(n.effective_impact)}>{n.title}</p>
+                  <p className="text-white/50">{n.description}</p>
                 </li>
               ))}
+              {!news.length && <li className="text-white/30">No news</li>}
             </ul>
-          </aside>
+          </div>
 
-          <section className="space-y-3">
-            <div className="border border-line bg-panel p-3">
-              <div className="flex items-end justify-between">
-                <div>
-                  <h2 className="text-2xl font-semibold">{selected?.ticker ?? "—"}</h2>
-                  <p className="text-sm text-muted">{selected?.company_name}</p>
-                </div>
-                <p className="font-mono text-3xl">
-                  {selected ? Number(selected.last_traded_price).toFixed(2) : "—"}
-                </p>
-              </div>
-              <div className="mt-4 h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={priceSeries}>
-                    <XAxis dataKey="t" hide />
-                    <YAxis domain={["auto", "auto"]} width={50} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="px" stroke="#3ecf8e" dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+          <div className="mt-4">
+            <Leaderboard
+              rows={leaderboard}
+              variant="terminal"
+              highlightTraderId={traderId}
+              maxRows={12}
+            />
+          </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="border border-line bg-panel p-3">
-                <h3 className="font-mono text-xs uppercase text-muted">Order ticket</h3>
+          {/* Advanced */}
+          <button
+            type="button"
+            className="mt-6 text-xs text-white/50 underline"
+            onClick={() => setAdvancedOpen((v) => !v)}
+          >
+            {advancedOpen ? "Hide advanced" : "Advanced orders & order book"}
+          </button>
+
+          {advancedOpen && (
+            <div className={`${panel} mt-3 space-y-4 p-4`}>
+              <div>
+                <p className="text-xs text-white/40">Limit order</p>
                 <div className="mt-2 flex gap-2">
                   <button
-                    className={`flex-1 py-2 ${side === "buy" ? "bg-accent text-black" : "bg-line"}`}
-                    onClick={() => setSide("buy")}
+                    type="button"
+                    className={`flex-1 py-1 text-xs ${limitSide === "buy" ? "bg-[#22c55e] text-black" : "border border-white/20"}`}
+                    onClick={() => setLimitSide("buy")}
                   >
                     Buy
                   </button>
                   <button
-                    className={`flex-1 py-2 ${side === "sell" ? "bg-warn text-black" : "bg-line"}`}
-                    onClick={() => setSide("sell")}
+                    type="button"
+                    className={`flex-1 py-1 text-xs ${limitSide === "sell" ? "bg-[#ef4444] text-black" : "border border-white/20"}`}
+                    onClick={() => setLimitSide("sell")}
                   >
                     Sell
                   </button>
                 </div>
-                <div className="mt-2 flex gap-2">
-                  <button
-                    className={`flex-1 py-1 text-sm ${orderType === "limit" ? "bg-line" : ""}`}
-                    onClick={() => setOrderType("limit")}
-                  >
-                    Limit
-                  </button>
-                  <button
-                    className={`flex-1 py-1 text-sm ${orderType === "market" ? "bg-line" : ""}`}
-                    onClick={() => setOrderType("market")}
-                  >
-                    Market
-                  </button>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <input type="number" className={inputCls} value={qty} onChange={(e) => setQty(Number(e.target.value))} />
+                  <input className={inputCls} value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} />
                 </div>
-                <label className="mt-3 block text-xs text-muted">Quantity</label>
-                <input
-                  type="number"
-                  className="w-full border border-line bg-background px-2 py-1"
-                  value={qty}
-                  onChange={(e) => setQty(Number(e.target.value))}
-                />
-                {orderType === "limit" && (
-                  <>
-                    <label className="mt-2 block text-xs text-muted">Price</label>
-                    <input
-                      className="w-full border border-line bg-background px-2 py-1"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                    />
-                  </>
-                )}
                 <button
-                  className="mt-3 w-full bg-accent py-2 font-mono text-sm text-black"
-                  onClick={submitOrder}
+                  type="button"
+                  disabled={submitting}
+                  className="mt-2 w-full border border-white/30 py-2 text-xs"
+                  onClick={submitLimitOrder}
                 >
-                  Submit {side.toUpperCase()}
+                  Place limit order
                 </button>
               </div>
 
-              <div className="border border-line bg-panel p-3">
-                <h3 className="font-mono text-xs uppercase text-muted">Order book</h3>
-                <p className="mt-1 font-mono text-xs text-muted">
-                  Spread {book?.spread ?? "—"} · Bid {book?.best_bid ?? "—"} · Ask{" "}
-                  {book?.best_ask ?? "—"}
+              <div>
+                <p className="text-xs text-white/40">
+                  Order book · spread {book?.spread ?? "—"}
                 </p>
-                <div className="mt-2 grid grid-cols-2 gap-2 font-mono text-xs">
+                <div className="mt-2 grid grid-cols-2 gap-3 text-xs tabular-nums">
                   <div>
-                    <p className="text-muted">Bids</p>
-                    {(book?.bids ?? []).slice(0, 8).map((l) => (
-                      <div key={`b-${l.price}`} className="flex justify-between text-accent">
+                    <p className="text-[#22c55e]">Bids</p>
+                    {(book?.bids ?? []).slice(0, 6).map((l) => (
+                      <div key={`b-${l.price}`} className="flex justify-between text-[#22c55e]">
                         <span>{l.price}</span>
-                        <span>{l.quantity}</span>
+                        <span className="text-white/40">{l.quantity}</span>
                       </div>
                     ))}
                   </div>
                   <div>
-                    <p className="text-muted">Asks</p>
-                    {(book?.asks ?? []).slice(0, 8).map((l) => (
-                      <div key={`a-${l.price}`} className="flex justify-between text-warn">
+                    <p className="text-[#ef4444]">Asks</p>
+                    {(book?.asks ?? []).slice(0, 6).map((l) => (
+                      <div key={`a-${l.price}`} className="flex justify-between text-[#ef4444]">
                         <span>{l.price}</span>
-                        <span>{l.quantity}</span>
+                        <span className="text-white/40">{l.quantity}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="border border-line bg-panel p-3">
-                <h3 className="font-mono text-xs uppercase text-muted">Positions</h3>
-                <ul className="mt-2 space-y-1 font-mono text-xs">
-                  {(portfolio?.holdings ?? []).map((h, i) => (
-                    <li key={i} className="flex justify-between">
-                      <span>
-                        {h.ticker} × {h.quantity}
-                      </span>
-                      <span>{h.unrealized_pnl}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="border border-line bg-panel p-3">
-                <h3 className="font-mono text-xs uppercase text-muted">Open orders</h3>
-                <ul className="mt-2 space-y-1 font-mono text-xs">
+              <div>
+                <p className="text-xs text-white/40">Open limit orders</p>
+                <ul className="mt-2 space-y-1 text-xs">
                   {orders
                     .filter((o) => o.status === "open" || o.status === "partially_filled")
                     .map((o) => (
-                      <li key={String(o.id)} className="flex items-center justify-between gap-2">
+                      <li key={String(o.id)} className="flex justify-between gap-2">
                         <span>
                           {String(o.side)} {String(o.remaining_quantity)} @ {String(o.price)}
                         </span>
-                        <button
-                          className="text-warn"
-                          onClick={() => cancelOrder(Number(o.id))}
-                        >
+                        <button type="button" className="text-[#ef4444]" onClick={() => cancelOrder(Number(o.id))}>
                           Cancel
                         </button>
                       </li>
                     ))}
                 </ul>
               </div>
-              <div className="border border-line bg-panel p-3">
-                <h3 className="font-mono text-xs uppercase text-muted">Trades</h3>
-                <ul className="mt-2 space-y-1 font-mono text-xs">
-                  {trades.slice(0, 12).map((t) => (
-                    <li key={String(t.id)}>
-                      {String(t.quantity)} @ {String(t.price)}
-                    </li>
-                  ))}
-                </ul>
-              </div>
             </div>
-          </section>
+          )}
+        </div>
+      )}
 
-          <aside className="space-y-3">
-            <div className="border border-line bg-panel p-3">
-              <h2 className="font-mono text-xs uppercase text-muted">News</h2>
-              <ul className="mt-2 space-y-2 text-sm">
-                {news.slice(0, 8).map((n) => (
-                  <li key={n.id}>
-                    <p className="font-medium">{n.title}</p>
-                    <p className="text-xs text-muted">{n.description}</p>
-                  </li>
-                ))}
-                {!news.length && <p className="text-xs text-muted">No released news yet.</p>}
-              </ul>
+      {confirmSide && selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
+          <div className="w-full max-w-sm border border-white/25 bg-black p-4">
+            <p className="text-xs text-white/40">Confirm</p>
+            <p className="mt-2 text-lg">
+              {confirmSide === "buy" ? "Buy" : "Sell"} {qty} shares of {selected.ticker}
+            </p>
+            <p className="mt-1 text-xs text-white/50">
+              Current price ₹{num(selected.last_traded_price).toFixed(2)} · executes immediately at market price
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                className="flex-1 border border-white/25 py-2 text-xs"
+                disabled={submitting}
+                onClick={() => setConfirmSide(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={`flex-1 py-2 text-xs text-black disabled:opacity-40 ${
+                  confirmSide === "buy" ? "bg-[#22c55e]" : "bg-[#ef4444]"
+                }`}
+                disabled={submitting}
+                onClick={() => executeMarketOrder(confirmSide)}
+              >
+                {submitting ? "…" : "Confirm"}
+              </button>
             </div>
-            <div className="border border-line bg-panel p-3">
-              <h2 className="font-mono text-xs uppercase text-muted">Leaderboard</h2>
-              <ul className="mt-2 space-y-1 font-mono text-xs">
-                {leaders.slice(0, 10).map((r) => (
-                  <li key={r.rank} className="flex justify-between">
-                    <span>
-                      #{r.rank} {r.name}
-                    </span>
-                    <span>{r.return_pct}%</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </aside>
+          </div>
         </div>
       )}
     </div>
