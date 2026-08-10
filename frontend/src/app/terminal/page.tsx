@@ -107,7 +107,7 @@ export default function TerminalPage() {
 
   useEffect(() => {
     refresh();
-    const id = window.setInterval(refresh, 4000);
+    const id = window.setInterval(refresh, 8000);
     return () => window.clearInterval(id);
   }, [refresh]);
 
@@ -165,15 +165,30 @@ export default function TerminalPage() {
 
   async function submitOrder() {
     if (!traderId || !selectedId) return;
-    await apiPost("/orders", {
-      trader_id: traderId,
-      stock_id: selectedId,
-      side,
-      order_type: orderType,
-      quantity: qty,
-      price: orderType === "limit" ? price : null,
-    });
-    await refresh();
+    try {
+      const result = await apiPost<{
+        rejected?: boolean;
+        detail?: string;
+        order: { status: string };
+        trades: unknown[];
+      }>("/orders", {
+        trader_id: traderId,
+        stock_id: selectedId,
+        side,
+        order_type: orderType,
+        quantity: qty,
+        price: orderType === "limit" ? price : null,
+      });
+      if (result.rejected) {
+        setError(result.detail ?? "Order rejected");
+      } else {
+        setError(null);
+      }
+      await refresh();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "order failed";
+      setError(msg);
+    }
   }
 
   async function cancelOrder(id: number) {

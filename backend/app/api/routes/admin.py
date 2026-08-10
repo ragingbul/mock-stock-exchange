@@ -12,7 +12,7 @@ from app.models import MarketSession, Stock
 from app.models.enums import MarketSessionStatus
 from app.realtime.ws_manager import manager
 from app.schemas.orders import HaltRequest, NewsCreate, NewsRead, SessionUpdate
-from app.services import leaderboard_service, news_service, order_service, stock_service
+from app.services import news_service, order_service, stock_service
 from app.services.news_service import effective_impact
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -108,14 +108,31 @@ def list_news(db: Session = Depends(get_db)) -> list[NewsRead]:
 
 @router.get("/overview")
 def overview(db: Session = Depends(get_db)) -> dict:
+    from sqlalchemy import func, select
+
+    from app.models import Order, Trade, Trader
+    from app.models.enums import TraderType
+    from app.models.order_enums import OrderStatus
+
     settings = get_settings()
+    trade_count = db.scalar(select(func.count(Trade.id))) or 0
+    open_count = db.scalar(
+        select(func.count(Order.id)).where(
+            Order.status.in_([OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED])
+        )
+    ) or 0
+    stock_count = len(stock_service.list_stocks(db))
+    human_count = db.scalar(
+        select(func.count(Trader.id)).where(Trader.trader_type == TraderType.HUMAN)
+    ) or 0
+
     return {
-        "stocks": len(stock_service.list_stocks(db)),
-        "trades": len(order_service.list_trades(db, limit=10_000)),
-        "open_orders": len(order_service.list_orders(db, open_only=True)),
+        "stocks": stock_count,
+        "trades": int(trade_count),
+        "open_orders": int(open_count),
+        "human_traders": int(human_count),
         "starting_capital": settings.default_starting_capital,
         "circuit_pct": settings.default_circuit_pct,
-        "leaderboard": leaderboard_service.compute_leaderboard(db)[:10],
     }
 
 

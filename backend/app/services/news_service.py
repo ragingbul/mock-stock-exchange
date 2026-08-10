@@ -57,10 +57,12 @@ def release_news(db: Session, event_id: int, *, now: datetime | None = None) -> 
             apply = event.market_wide
             if stock.ticker in tickers:
                 apply = True
-            if stock.sector.value in sectors or (
-                sectors and stock.sector == Sector(sectors[0]) if sectors[0] in Sector._value2member_map_ else False
-            ):
+            if stock.sector.value in sectors:
                 apply = True
+            elif sectors:
+                first = sectors[0]
+                if first in Sector._value2member_map_ and stock.sector == Sector(first):
+                    apply = True
             if apply:
                 stock.fair_value = (stock.fair_value * factor).quantize(Decimal("0.0001"))
 
