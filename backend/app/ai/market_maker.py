@@ -11,8 +11,8 @@ class MarketMakerStrategy(TraderStrategy):
     name = "market_maker"
 
     def decide(self, view: MarketView, cash: Decimal, position: int) -> StrategyOrderIntent | None:
-        spread_bps = float(self.config.get("spread_bps", 40))
-        size = int(self.config.get("quote_size", 50))
+        spread_bps = float(self.config.get("spread_bps", 120))
+        size = int(self.config.get("quote_size", 35))
         max_pos = int(self.config.get("max_position", 2000))
         mid = view.last_price
         half = mid * Decimal(str(spread_bps / 10000))

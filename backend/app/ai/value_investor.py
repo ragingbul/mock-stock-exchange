@@ -11,9 +11,9 @@ class ValueInvestorStrategy(TraderStrategy):
     name = "value_investor"
 
     def decide(self, view: MarketView, cash: Decimal, position: int) -> StrategyOrderIntent | None:
-        discount = float(self.config.get("buy_discount", 0.08))
-        premium = float(self.config.get("sell_premium", 0.12))
-        size = int(self.config.get("size", 20))
+        discount = float(self.config.get("buy_discount", 0.18))
+        premium = float(self.config.get("sell_premium", 0.22))
+        size = int(self.config.get("size", 35))
         if view.fair_value <= 0:
             return None
         gap = float((view.last_price - view.fair_value) / view.fair_value)

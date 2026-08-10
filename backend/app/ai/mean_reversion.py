@@ -11,8 +11,8 @@ class MeanReversionStrategy(TraderStrategy):
     name = "mean_reversion"
 
     def decide(self, view: MarketView, cash: Decimal, position: int) -> StrategyOrderIntent | None:
-        band = float(self.config.get("band", 0.03))
-        size = int(self.config.get("size", 25))
+        band = float(self.config.get("band", 0.12))
+        size = int(self.config.get("size", 40))
         if view.fair_value <= 0:
             return None
         gap = float((view.last_price - view.fair_value) / view.fair_value)

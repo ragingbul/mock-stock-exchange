@@ -73,14 +73,16 @@ def compute_signals(
     last_price: Decimal,
     reference_price: Decimal,
     weights: MarketForceWeights | None = None,
-    noise_std: float = 0.02,
+    noise_std: float | None = None,
     rng: random.Random | None = None,
 ) -> MarketSignals:
     settings = get_settings()
     rng = rng or random.Random(settings.random_seed)
+    w = weights or MarketForceWeights(wn=settings.market_news_weight)
     p = order_pressure(buy_notional, sell_notional)
-    m = combined_force(p, sentiment, news, ai_pressure, weights)
-    noise = rng.uniform(-noise_std, noise_std)
+    m = combined_force(p, sentiment, news, ai_pressure, w)
+    std = noise_std if noise_std is not None else settings.market_noise_std
+    noise = rng.uniform(-std, std)
     signal = m + noise
     correction = fair_value_correction(fair_value, last_price)
     new_ref = update_reference_price(reference_price, m)

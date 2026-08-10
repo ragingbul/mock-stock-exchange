@@ -168,7 +168,9 @@ def market_status(db: Session = Depends(get_db)) -> dict:
 
 @router.post("/ai/seed")
 def seed_ai(db: Session = Depends(get_db)) -> dict:
-    return {"created": ai_runner.seed_default_agents(db)}
+    created = ai_runner.seed_default_agents(db)
+    synced = ai_runner.sync_intensity_configs(db)
+    return {"created": created, "configs_synced": synced}
 
 
 @router.post("/ai/tick")

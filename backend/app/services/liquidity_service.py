@@ -11,6 +11,7 @@ from app.exchange.book_registry import books
 from app.exchange.order_book import OrderBook
 from app.models import AIAgent, OrderSide, OrderType, Stock, Trader
 from app.schemas import HoldingAdjust
+from app.core.config import get_settings
 from app.services import order_service, portfolio_service
 
 
@@ -40,9 +41,10 @@ def _quantize_price(price: Decimal, tick: Decimal) -> Decimal:
     return steps * tick
 
 
-def _quote_prices(stock: Stock, spread_bps: float = 40) -> tuple[Decimal, Decimal]:
+def _quote_prices(stock: Stock, spread_bps: float | None = None) -> tuple[Decimal, Decimal]:
+    bps = spread_bps if spread_bps is not None else get_settings().mm_spread_bps
     mid = Decimal(stock.last_traded_price)
-    half = mid * Decimal(str(spread_bps / 10000))
+    half = mid * Decimal(str(bps / 10000))
     tick = Decimal(stock.tick_size)
     bid = _quantize_price(mid - half, tick)
     ask = _quantize_price(mid + half, tick)
@@ -71,10 +73,13 @@ def provision_two_sided_quotes(
     db: Session,
     stock: Stock,
     *,
-    quote_size: int = 200,
-    spread_bps: float = 40,
+    quote_size: int | None = None,
+    spread_bps: float | None = None,
 ) -> int:
     """Post resting bid and ask from the market-maker agent. Returns orders placed."""
+    settings = get_settings()
+    quote_size = quote_size if quote_size is not None else settings.mm_quote_size
+    spread_bps = spread_bps if spread_bps is not None else settings.mm_spread_bps
     agent = _market_maker_agent(db)
     if agent is None:
         return 0
@@ -127,7 +132,8 @@ def ensure_liquidity_for_market_order(
 ) -> None:
     """Add MM quotes on the opposite side if the book lacks depth for this trader."""
     book = books.get(stock.id)
-    need = max(quantity, 50)
+    settings = get_settings()
+    need = max(quantity, settings.mm_min_book_depth)
     if side == OrderSide.BUY:
         if _opposite_available(book, side, trader_id) >= need:
             return
@@ -170,10 +176,12 @@ def ensure_liquidity_for_market_order(
             pass
 
 
-def seed_all_liquidity(db: Session, *, quote_size: int = 200) -> int:
+def seed_all_liquidity(db: Session, *, quote_size: int | None = None) -> int:
     from app.services import stock_service
 
+    settings = get_settings()
+    size = quote_size if quote_size is not None else settings.mm_quote_size
     total = 0
     for stock in stock_service.list_stocks(db):
-        total += provision_two_sided_quotes(db, stock, quote_size=quote_size)
+        total += provision_two_sided_quotes(db, stock, quote_size=size)
     return total
