@@ -3,19 +3,48 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.ai import runner as ai_runner
 from app.core.config import get_settings
 from app.core.database import get_db
-from app.models import MarketSession, Stock
-from app.models.enums import MarketSessionStatus
+from app.models import AIAgent, MarketSession, Stock
+from app.models.enums import MarketSessionStatus, TraderType
+from app.models.order_enums import OrderStatus
+from app.models import Order, Trade, Trader
 from app.realtime.ws_manager import manager
 from app.schemas.orders import HaltRequest, NewsCreate, NewsRead, SessionUpdate
 from app.services import news_service, order_service, stock_service
 from app.services.news_service import effective_impact
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def _market_status(db: Session) -> dict:
+    session = db.scalar(select(MarketSession).order_by(MarketSession.id.desc()).limit(1))
+    stocks = stock_service.list_stocks(db)
+    halted = sum(1 for s in stocks if s.is_halted)
+    ai_count = db.scalar(select(func.count(AIAgent.id))) or 0
+    ai_enabled = db.scalar(
+        select(func.count(AIAgent.id)).where(AIAgent.is_enabled.is_(True))
+    ) or 0
+    status = session.status.value if session else "none"
+    online = (
+        session is not None
+        and session.status == MarketSessionStatus.OPEN
+        and halted < len(stocks)
+    )
+    return {
+        "server_time_utc": datetime.now(timezone.utc).isoformat(),
+        "session_id": session.id if session else None,
+        "session_status": status,
+        "market_online": online,
+        "stocks_total": len(stocks),
+        "stocks_halted": halted,
+        "ai_agents": int(ai_count),
+        "ai_agents_enabled": int(ai_enabled),
+    }
 
 
 @router.post("/session/start")
@@ -108,12 +137,6 @@ def list_news(db: Session = Depends(get_db)) -> list[NewsRead]:
 
 @router.get("/overview")
 def overview(db: Session = Depends(get_db)) -> dict:
-    from sqlalchemy import func, select
-
-    from app.models import Order, Trade, Trader
-    from app.models.enums import TraderType
-    from app.models.order_enums import OrderStatus
-
     settings = get_settings()
     trade_count = db.scalar(select(func.count(Trade.id))) or 0
     open_count = db.scalar(
@@ -133,7 +156,13 @@ def overview(db: Session = Depends(get_db)) -> dict:
         "human_traders": int(human_count),
         "starting_capital": settings.default_starting_capital,
         "circuit_pct": settings.default_circuit_pct,
+        **_market_status(db),
     }
+
+
+@router.get("/market-status")
+def market_status(db: Session = Depends(get_db)) -> dict:
+    return _market_status(db)
 
 
 @router.post("/ai/seed")

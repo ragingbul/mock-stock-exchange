@@ -1,15 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { apiDelete, apiGet, apiPost, wsUrl } from "@/lib/api";
+
+const UP = "#22c55e";
+const DOWN = "#ef4444";
 
 type Stock = {
   id: number;
@@ -47,6 +43,23 @@ type Book = {
 type News = { id: number; title: string; description: string; effective_impact?: string };
 type Leader = { rank: number; name: string; return_pct: string; portfolio_value: string };
 
+function num(v: string | number | null | undefined): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function signClass(value: string | number | null | undefined): string {
+  const n = num(value);
+  if (n > 0) return "text-[#22c55e]";
+  if (n < 0) return "text-[#ef4444]";
+  return "text-white";
+}
+
+function fmtPct(value: string | null | undefined): string {
+  const n = num(value);
+  return `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
+}
+
 export default function TerminalPage() {
   const [traderId, setTraderId] = useState<number | null>(null);
   const [traderName, setTraderName] = useState("Trader");
@@ -65,11 +78,18 @@ export default function TerminalPage() {
   const [status, setStatus] = useState("IDLE");
   const [priceSeries, setPriceSeries] = useState<Array<{ t: string; px: number }>>([]);
   const [error, setError] = useState<string | null>(null);
+  const [orderConfirmOpen, setOrderConfirmOpen] = useState(false);
+  const [submittingOrder, setSubmittingOrder] = useState(false);
 
   const selected = useMemo(
     () => stocks.find((s) => s.id === selectedId) ?? null,
-    [stocks, selectedId]
+    [stocks, selectedId],
   );
+
+  const chartStroke = useMemo(() => {
+    if (priceSeries.length < 2) return UP;
+    return priceSeries[priceSeries.length - 1].px >= priceSeries[0].px ? UP : DOWN;
+  }, [priceSeries]);
 
   const refresh = useCallback(async () => {
     try {
@@ -165,6 +185,7 @@ export default function TerminalPage() {
 
   async function submitOrder() {
     if (!traderId || !selectedId) return;
+    setSubmittingOrder(true);
     try {
       const result = await apiPost<{
         rejected?: boolean;
@@ -184,77 +205,88 @@ export default function TerminalPage() {
       } else {
         setError(null);
       }
+      setOrderConfirmOpen(false);
       await refresh();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "order failed";
-      setError(msg);
+      setError(e instanceof Error ? e.message : "order failed");
+    } finally {
+      setSubmittingOrder(false);
     }
   }
+
+  function openOrderConfirm() {
+    if (!traderId || !selectedId || !selected) return;
+    setOrderConfirmOpen(true);
+  }
+
+  const orderPriceLabel =
+    orderType === "limit" ? `₹${price}` : `market (~₹${selected?.last_traded_price ?? "—"})`;
 
   async function cancelOrder(id: number) {
     await apiDelete(`/orders/${id}?trader_id=${traderId}`);
     await refresh();
   }
 
+  const panel = "border border-white/15";
+  const inputCls =
+    "w-full border border-white/20 bg-black px-2 py-1.5 text-white outline-none focus:border-white";
+
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-line px-4 py-3">
-        <div>
-          <p className="font-mono text-xs uppercase tracking-[0.18em] text-accent">
-            Mock Stock Exchange
-          </p>
-          <h1 className="text-lg font-semibold">Trading Terminal</h1>
+    <div className="min-h-screen bg-black font-mono text-sm text-white">
+      <header className={`${panel} flex flex-wrap items-center justify-between gap-3 border-x-0 border-t-0 px-4 py-2`}>
+        <div className="flex items-center gap-4">
+          <span className="text-xs tracking-widest">MSE</span>
+          <span className="text-white/50">{status}</span>
         </div>
-        <div className="flex flex-wrap items-center gap-4 font-mono text-xs">
-          <span>STATUS {status}</span>
-          <span>VALUE {portfolio?.portfolio_value ?? "—"}</span>
+        <div className="flex flex-wrap items-center gap-4 text-xs">
+          <span>VAL {portfolio?.portfolio_value ?? "—"}</span>
           <span>CASH {portfolio?.cash ?? "—"}</span>
-          <span>P&L {portfolio?.total_pnl ?? "—"}</span>
-          <a className="text-accent underline" href="/admin">
-            Admin
-          </a>
+          <span className={signClass(portfolio?.total_pnl)}>P&L {portfolio?.total_pnl ?? "—"}</span>
+          <a className="text-white underline underline-offset-2" href="/admin">Admin</a>
         </div>
       </header>
 
       {!traderId ? (
-        <div className="mx-auto max-w-md px-4 py-16">
-          <h2 className="text-xl font-semibold">Join session</h2>
+        <div className="mx-auto max-w-sm px-4 py-20">
+          <p className="text-xs text-white/50">JOIN</p>
           <input
-            className="mt-4 w-full border border-line bg-panel px-3 py-2"
+            className={`${inputCls} mt-3`}
             value={traderName}
             onChange={(e) => setTraderName(e.target.value)}
-            placeholder="Display name"
+            placeholder="Name"
           />
           <button
-            className="mt-4 bg-accent px-4 py-2 font-mono text-sm text-black"
+            type="button"
+            className="mt-4 w-full border border-[#22c55e] py-2 text-[#22c55e] transition active:scale-[0.98]"
             onClick={join}
           >
-            Create trader
+            Enter market
           </button>
-          {error && <p className="mt-3 text-sm text-warn">{error}</p>}
+          {error && <p className="mt-3 text-xs text-[#ef4444]">{error}</p>}
         </div>
       ) : (
-        <div className="grid gap-3 p-3 lg:grid-cols-[220px_1fr_280px]">
-          <aside className="border border-line bg-panel p-3">
-            <h2 className="font-mono text-xs uppercase text-muted">Watchlist</h2>
-            <ul className="mt-2 space-y-1">
+        <div className="grid gap-0 lg:grid-cols-[11rem_1fr_12rem]">
+          <aside className={`${panel} border-l-0 border-t-0 p-2 lg:min-h-[calc(100vh-2.5rem)]`}>
+            <p className="mb-2 text-[10px] text-white/40">WATCH</p>
+            <ul className="space-y-0">
               {stocks.map((s) => (
                 <li key={s.id}>
                   <button
-                    className={`w-full px-2 py-1 text-left font-mono text-sm ${
-                      selectedId === s.id ? "bg-line" : ""
+                    type="button"
+                    className={`w-full px-1 py-1.5 text-left text-xs transition ${
+                      selectedId === s.id ? "bg-white text-black" : "hover:bg-white/10"
                     }`}
                     onClick={() => {
                       setSelectedId(s.id);
                       setPrice(s.last_traded_price);
                     }}
                   >
-                    <div className="flex justify-between">
+                    <div className="flex justify-between gap-2">
                       <span>{s.ticker}</span>
-                      <span>{Number(s.last_traded_price).toFixed(2)}</span>
+                      <span>{num(s.last_traded_price).toFixed(2)}</span>
                     </div>
-                    <div className="text-xs text-muted">
-                      {s.percent_change ?? "0"}%
+                    <div className={`text-[10px] ${selectedId === s.id ? "text-black/60" : signClass(s.percent_change)}`}>
+                      {fmtPct(s.percent_change)}
                     </div>
                   </button>
                 </li>
@@ -262,107 +294,129 @@ export default function TerminalPage() {
             </ul>
           </aside>
 
-          <section className="space-y-3">
-            <div className="border border-line bg-panel p-3">
-              <div className="flex items-end justify-between">
-                <div>
-                  <h2 className="text-2xl font-semibold">{selected?.ticker ?? "—"}</h2>
-                  <p className="text-sm text-muted">{selected?.company_name}</p>
-                </div>
-                <p className="font-mono text-3xl">
-                  {selected ? Number(selected.last_traded_price).toFixed(2) : "—"}
+          <section className="border-b border-white/15 lg:border-r">
+            <div className="flex items-baseline justify-between gap-4 border-b border-white/15 px-4 py-3">
+              <div>
+                <p className="text-2xl font-semibold tracking-tight">{selected?.ticker ?? "—"}</p>
+                <p className={`text-sm ${signClass(selected?.percent_change)}`}>
+                  {selected ? fmtPct(selected.percent_change) : "—"}
                 </p>
               </div>
-              <div className="mt-4 h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={priceSeries}>
-                    <XAxis dataKey="t" hide />
-                    <YAxis domain={["auto", "auto"]} width={50} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="px" stroke="#3ecf8e" dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              <p className={`text-3xl tabular-nums ${signClass(selected?.percent_change)}`}>
+                {selected ? num(selected.last_traded_price).toFixed(2) : "—"}
+              </p>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="border border-line bg-panel p-3">
-                <h3 className="font-mono text-xs uppercase text-muted">Order ticket</h3>
-                <div className="mt-2 flex gap-2">
+            <div className="h-36 border-b border-white/15 px-2 py-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={priceSeries}>
+                  <XAxis dataKey="t" hide />
+                  <YAxis domain={["auto", "auto"]} hide />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#000",
+                      border: "1px solid rgba(255,255,255,0.2)",
+                      fontSize: 11,
+                      color: "#fff",
+                    }}
+                    labelStyle={{ color: "rgba(255,255,255,0.5)" }}
+                  />
+                  <Line type="monotone" dataKey="px" stroke={chartStroke} strokeWidth={1.5} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="grid md:grid-cols-2">
+              <div className="border-b border-white/15 p-3 md:border-r">
+                <p className="text-[10px] text-white/40">ORDER</p>
+                <div className="mt-2 flex gap-1">
                   <button
-                    className={`flex-1 py-2 ${side === "buy" ? "bg-accent text-black" : "bg-line"}`}
+                    type="button"
+                    className={`flex-1 py-1.5 text-xs ${
+                      side === "buy" ? "bg-[#22c55e] text-black" : "border border-white/20 text-white"
+                    }`}
                     onClick={() => setSide("buy")}
                   >
-                    Buy
+                    BUY
                   </button>
                   <button
-                    className={`flex-1 py-2 ${side === "sell" ? "bg-warn text-black" : "bg-line"}`}
+                    type="button"
+                    className={`flex-1 py-1.5 text-xs ${
+                      side === "sell" ? "bg-[#ef4444] text-black" : "border border-white/20 text-white"
+                    }`}
                     onClick={() => setSide("sell")}
                   >
-                    Sell
+                    SELL
                   </button>
                 </div>
-                <div className="mt-2 flex gap-2">
+                <div className="mt-2 flex gap-1 text-[10px]">
                   <button
-                    className={`flex-1 py-1 text-sm ${orderType === "limit" ? "bg-line" : ""}`}
+                    type="button"
+                    className={`flex-1 py-1 ${orderType === "limit" ? "bg-white text-black" : "text-white/50"}`}
                     onClick={() => setOrderType("limit")}
                   >
-                    Limit
+                    LMT
                   </button>
                   <button
-                    className={`flex-1 py-1 text-sm ${orderType === "market" ? "bg-line" : ""}`}
+                    type="button"
+                    className={`flex-1 py-1 ${orderType === "market" ? "bg-white text-black" : "text-white/50"}`}
                     onClick={() => setOrderType("market")}
                   >
-                    Market
+                    MKT
                   </button>
                 </div>
-                <label className="mt-3 block text-xs text-muted">Quantity</label>
-                <input
-                  type="number"
-                  className="w-full border border-line bg-background px-2 py-1"
-                  value={qty}
-                  onChange={(e) => setQty(Number(e.target.value))}
-                />
-                {orderType === "limit" && (
-                  <>
-                    <label className="mt-2 block text-xs text-muted">Price</label>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-white/40">QTY</label>
                     <input
-                      className="w-full border border-line bg-background px-2 py-1"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
+                      type="number"
+                      className={inputCls}
+                      value={qty}
+                      onChange={(e) => setQty(Number(e.target.value))}
                     />
-                  </>
-                )}
+                  </div>
+                  {orderType === "limit" && (
+                    <div>
+                      <label className="text-[10px] text-white/40">PRICE</label>
+                      <input className={inputCls} value={price} onChange={(e) => setPrice(e.target.value)} />
+                    </div>
+                  )}
+                </div>
                 <button
-                  className="mt-3 w-full bg-accent py-2 font-mono text-sm text-black"
-                  onClick={submitOrder}
+                  type="button"
+                  className={`mt-3 w-full py-2 text-xs transition active:scale-[0.98] disabled:opacity-40 ${
+                    side === "buy"
+                      ? "bg-[#22c55e] text-black"
+                      : "bg-[#ef4444] text-black"
+                  }`}
+                  disabled={submittingOrder}
+                  onClick={openOrderConfirm}
                 >
-                  Submit {side.toUpperCase()}
+                  {side.toUpperCase()}
                 </button>
+                {error && <p className="mt-2 text-[10px] text-[#ef4444]">{error}</p>}
               </div>
 
-              <div className="border border-line bg-panel p-3">
-                <h3 className="font-mono text-xs uppercase text-muted">Order book</h3>
-                <p className="mt-1 font-mono text-xs text-muted">
-                  Spread {book?.spread ?? "—"} · Bid {book?.best_bid ?? "—"} · Ask{" "}
-                  {book?.best_ask ?? "—"}
+              <div className="border-b border-white/15 p-3">
+                <p className="text-[10px] text-white/40">
+                  BOOK · {book?.spread ?? "—"}
                 </p>
-                <div className="mt-2 grid grid-cols-2 gap-2 font-mono text-xs">
+                <div className="mt-2 grid grid-cols-2 gap-3 text-[11px] tabular-nums">
                   <div>
-                    <p className="text-muted">Bids</p>
-                    {(book?.bids ?? []).slice(0, 8).map((l) => (
-                      <div key={`b-${l.price}`} className="flex justify-between text-accent">
+                    <p className="mb-1 text-[10px] text-[#22c55e]">BID</p>
+                    {(book?.bids ?? []).slice(0, 6).map((l) => (
+                      <div key={`b-${l.price}`} className="flex justify-between text-[#22c55e]">
                         <span>{l.price}</span>
-                        <span>{l.quantity}</span>
+                        <span className="text-white/50">{l.quantity}</span>
                       </div>
                     ))}
                   </div>
                   <div>
-                    <p className="text-muted">Asks</p>
-                    {(book?.asks ?? []).slice(0, 8).map((l) => (
-                      <div key={`a-${l.price}`} className="flex justify-between text-warn">
+                    <p className="mb-1 text-[10px] text-[#ef4444]">ASK</p>
+                    {(book?.asks ?? []).slice(0, 6).map((l) => (
+                      <div key={`a-${l.price}`} className="flex justify-between text-[#ef4444]">
                         <span>{l.price}</span>
-                        <span>{l.quantity}</span>
+                        <span className="text-white/50">{l.quantity}</span>
                       </div>
                     ))}
                   </div>
@@ -370,80 +424,118 @@ export default function TerminalPage() {
               </div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="border border-line bg-panel p-3">
-                <h3 className="font-mono text-xs uppercase text-muted">Positions</h3>
-                <ul className="mt-2 space-y-1 font-mono text-xs">
+            <div className="grid text-[11px] md:grid-cols-3">
+              <div className="border-b border-white/15 p-3 md:border-r">
+                <p className="text-[10px] text-white/40">POSITIONS</p>
+                <ul className="mt-2 space-y-1">
                   {(portfolio?.holdings ?? []).map((h, i) => (
-                    <li key={i} className="flex justify-between">
-                      <span>
-                        {h.ticker} × {h.quantity}
-                      </span>
-                      <span>{h.unrealized_pnl}</span>
+                    <li key={i} className="flex justify-between gap-2">
+                      <span>{h.ticker} {h.quantity}</span>
+                      <span className={signClass(h.unrealized_pnl)}>{h.unrealized_pnl}</span>
                     </li>
                   ))}
+                  {!portfolio?.holdings?.length && <li className="text-white/30">—</li>}
                 </ul>
               </div>
-              <div className="border border-line bg-panel p-3">
-                <h3 className="font-mono text-xs uppercase text-muted">Open orders</h3>
-                <ul className="mt-2 space-y-1 font-mono text-xs">
+              <div className="border-b border-white/15 p-3 md:border-r">
+                <p className="text-[10px] text-white/40">OPEN</p>
+                <ul className="mt-2 space-y-1">
                   {orders
                     .filter((o) => o.status === "open" || o.status === "partially_filled")
                     .map((o) => (
-                      <li key={String(o.id)} className="flex items-center justify-between gap-2">
-                        <span>
-                          {String(o.side)} {String(o.remaining_quantity)} @ {String(o.price)}
+                      <li key={String(o.id)} className="flex justify-between gap-2">
+                        <span className={String(o.side) === "buy" ? "text-[#22c55e]" : "text-[#ef4444]"}>
+                          {String(o.side)} {String(o.remaining_quantity)} @{String(o.price)}
                         </span>
                         <button
-                          className="text-warn"
+                          type="button"
+                          className="text-[#ef4444]"
                           onClick={() => cancelOrder(Number(o.id))}
                         >
-                          Cancel
+                          ×
                         </button>
                       </li>
                     ))}
+                  {!orders.filter((o) => o.status === "open" || o.status === "partially_filled").length && (
+                    <li className="text-white/30">—</li>
+                  )}
                 </ul>
               </div>
-              <div className="border border-line bg-panel p-3">
-                <h3 className="font-mono text-xs uppercase text-muted">Trades</h3>
-                <ul className="mt-2 space-y-1 font-mono text-xs">
-                  {trades.slice(0, 12).map((t) => (
-                    <li key={String(t.id)}>
-                      {String(t.quantity)} @ {String(t.price)}
-                    </li>
+              <div className="border-b border-white/15 p-3">
+                <p className="text-[10px] text-white/40">FILLS</p>
+                <ul className="mt-2 space-y-1">
+                  {trades.slice(0, 8).map((t) => (
+                    <li key={String(t.id)}>{String(t.quantity)} @ {String(t.price)}</li>
                   ))}
+                  {!trades.length && <li className="text-white/30">—</li>}
                 </ul>
               </div>
             </div>
           </section>
 
-          <aside className="space-y-3">
-            <div className="border border-line bg-panel p-3">
-              <h2 className="font-mono text-xs uppercase text-muted">News</h2>
-              <ul className="mt-2 space-y-2 text-sm">
-                {news.slice(0, 8).map((n) => (
-                  <li key={n.id}>
-                    <p className="font-medium">{n.title}</p>
-                    <p className="text-xs text-muted">{n.description}</p>
-                  </li>
-                ))}
-                {!news.length && <p className="text-xs text-muted">No released news yet.</p>}
-              </ul>
-            </div>
-            <div className="border border-line bg-panel p-3">
-              <h2 className="font-mono text-xs uppercase text-muted">Leaderboard</h2>
-              <ul className="mt-2 space-y-1 font-mono text-xs">
-                {leaders.slice(0, 10).map((r) => (
-                  <li key={r.rank} className="flex justify-between">
-                    <span>
-                      #{r.rank} {r.name}
-                    </span>
-                    <span>{r.return_pct}%</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          <aside className={`${panel} border-r-0 border-t-0 p-2 lg:min-h-[calc(100vh-2.5rem)]`}>
+            <p className="mb-2 text-[10px] text-white/40">NEWS</p>
+            <ul className="space-y-2 text-[11px]">
+              {news.slice(0, 5).map((n) => (
+                <li key={n.id} className="border-b border-white/10 pb-2">
+                  <p className={signClass(n.effective_impact)}>{n.title}</p>
+                </li>
+              ))}
+              {!news.length && <li className="text-white/30">—</li>}
+            </ul>
+            <p className="mb-2 mt-4 text-[10px] text-white/40">RANK</p>
+            <ul className="space-y-1 text-[11px]">
+              {leaders.slice(0, 8).map((r) => (
+                <li key={r.rank} className="flex justify-between gap-2">
+                  <span className="text-white/70">{r.rank} {r.name}</span>
+                  <span className={signClass(r.return_pct)}>{r.return_pct}%</span>
+                </li>
+              ))}
+            </ul>
           </aside>
+        </div>
+      )}
+
+      {orderConfirmOpen && selected && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="order-confirm-title"
+        >
+          <div className="w-full max-w-sm border border-white/25 bg-black p-4">
+            <p id="order-confirm-title" className="text-[10px] text-white/40">CONFIRM</p>
+            <p className="mt-2 text-lg">
+              <span className={side === "buy" ? "text-[#22c55e]" : "text-[#ef4444]"}>
+                {side.toUpperCase()}
+              </span>
+              {" "}{qty} {selected.ticker}
+            </p>
+            <div className="mt-3 space-y-1 text-xs text-white/70">
+              <p>{orderType.toUpperCase()} · {orderPriceLabel}</p>
+              <p>Cash {portfolio?.cash ?? "—"}</p>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                className="flex-1 border border-white/25 py-2 text-xs"
+                disabled={submittingOrder}
+                onClick={() => setOrderConfirmOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={`flex-1 py-2 text-xs text-black disabled:opacity-40 ${
+                  side === "buy" ? "bg-[#22c55e]" : "bg-[#ef4444]"
+                }`}
+                disabled={submittingOrder}
+                onClick={submitOrder}
+              >
+                {submittingOrder ? "…" : "Confirm"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

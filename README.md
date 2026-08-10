@@ -86,3 +86,13 @@ pytest
 3. News never directly sets last traded price (optional fair-value update only).
 4. Admin does not manually set stock prices.
 5. Configuration over hard-coding for weights, capital, circuits, ticks.
+
+## Contributors
+
+1. **Raghav Singh** — [GitHub](https://github.com/ragingbul) · [LinkedIn](https://www.linkedin.com/in/raghav-singh-b24064279)
+2. **Soumil Tiwary** — [GitHub](https://github.com/S0UMIL) · [LinkedIn](https://www.linkedin.com/in/soumiltiwary)
+3. **Ishan Dhawan** — [GitHub](https://github.com/ishan1818) · [LinkedIn](https://www.linkedin.com/in/ishan-dhawan-130a17351)
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
