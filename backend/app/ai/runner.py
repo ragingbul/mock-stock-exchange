@@ -23,6 +23,8 @@ from app.services.trader_service import create_trader
 from app.services import news_service, order_service
 from app.services.market_intensity import strategy_configs
 from app.services.market_model import compute_signals
+from app.services.news_impact_resolver import combined_target_for_stock
+from app.services.simulation_settings_service import get_or_create_settings
 
 
 STRATEGIES: dict[str, type[TraderStrategy]] = {
@@ -108,6 +110,14 @@ def run_agent_once(db: Session, agent: AIAgent, stock: Stock) -> dict:
     bid = book.best_bid().price if book.best_bid() else None
     ask = book.best_ask().price if book.best_ask() else None
     news = float(news_service.news_pressure_for_ticker(db, stock.ticker))
+    impact = combined_target_for_stock(db, stock)
+    remaining = float(impact["remaining_impact_pct"])
+    reached = bool(impact["reached"])
+    settings = get_or_create_settings(db)
+    strength = float(settings.news_reaction_strength)
+    # Blend legacy news pressure with remaining target impact
+    if not reached and remaining != 0:
+        news = news + (remaining / 10.0) * strength
     buy_notional, sell_notional = _book_pressure(book)
     sentiment = max(-1.0, min(1.0, news * 0.6))
     signals = compute_signals(
@@ -126,6 +136,9 @@ def run_agent_once(db: Session, agent: AIAgent, stock: Stock) -> dict:
     return_vs_fv = (ltp - fv) / fv if fv else 0.0
     return_vs_prev = (ltp - prev) / prev if prev else 0.0
     recent_return = return_vs_fv * 0.75 + return_vs_prev * 0.25
+    # Bias recent_return toward remaining news target when active
+    if not reached:
+        recent_return = recent_return * 0.4 + (remaining / 100.0) * 0.6 * strength
     view = MarketView(
         ticker=stock.ticker,
         stock_id=stock.id,
@@ -136,11 +149,28 @@ def run_agent_once(db: Session, agent: AIAgent, stock: Stock) -> dict:
         recent_return=recent_return,
         news_impact=news,
         signal=signals.signal,
+        remaining_impact_pct=remaining,
+        target_reached=reached,
     )
-    strategy = build_strategy(agent.strategy, json.loads(agent.config_json or "{}"))
+    cfg = json.loads(agent.config_json or "{}")
+    # Reduce aggression once target is reached
+    if reached and agent.strategy in {"fomo", "panic", "momentum"}:
+        cfg["fire_rate"] = min(float(cfg.get("fire_rate", 0.5)), 0.25)
+        cfg["aggressiveness"] = min(float(cfg.get("aggressiveness", 0.5)), 0.3)
+    strategy = build_strategy(agent.strategy, cfg)
+    # Scale size by remaining impact for news-driven strategies
     intent = strategy.decide(view, Decimal(trader.cash), _position(db, trader.id, stock.id))
     if intent is None:
         return {"skipped": True, "reason": "no intent"}
+    if not reached and abs(remaining) > 0 and agent.strategy in {"fomo", "panic", "momentum"}:
+        boost = 1.0 + min(abs(remaining) / 5.0, 2.0) * strength
+        intent.quantity = max(1, int(intent.quantity * boost * float(settings.ai_aggressiveness)))
+    # Prefer selling into negative remaining targets / buying into positive
+    if not reached:
+        if remaining < -0.5 and intent.side == "buy" and agent.strategy == "fomo":
+            return {"skipped": True, "reason": "fomo suppressed by bearish target"}
+        if remaining > 0.5 and intent.side == "sell" and agent.strategy == "panic":
+            return {"skipped": True, "reason": "panic suppressed by bullish target"}
 
     side = OrderSide.BUY if intent.side == "buy" else OrderSide.SELL
     otype = OrderType.MARKET if intent.order_type == "market" else OrderType.LIMIT

@@ -1,6 +1,11 @@
 """SQLAlchemy ORM models."""
 
 from app.models.ai_agent import AIAgent
+from app.models.conditional_order import (
+    ConditionalOrder,
+    ConditionalStatus,
+    ConditionalType,
+)
 from app.models.enums import (
     FundamentalProfile,
     LiquidityClass,
@@ -11,10 +16,13 @@ from app.models.enums import (
     VolatilityClass,
 )
 from app.models.holding import Holding
+from app.models.ipo import IPO, IPOApplication, IPOApplicationStatus, IPOStatus
 from app.models.market_session import MarketSession
 from app.models.news import NewsEvent
 from app.models.order import Order
 from app.models.order_enums import OrderSide, OrderStatus, OrderType
+from app.models.sector import MarketSector
+from app.models.simulation_settings import SimulationSettings
 from app.models.snapshots import LeaderboardSnapshot, PortfolioSnapshot
 from app.models.stock import Stock
 from app.models.trade import Trade
@@ -33,6 +41,15 @@ __all__ = [
     "AIAgent",
     "PortfolioSnapshot",
     "LeaderboardSnapshot",
+    "MarketSector",
+    "ConditionalOrder",
+    "ConditionalStatus",
+    "ConditionalType",
+    "IPO",
+    "IPOApplication",
+    "IPOStatus",
+    "IPOApplicationStatus",
+    "SimulationSettings",
     "UserRole",
     "TraderType",
     "VolatilityClass",

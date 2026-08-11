@@ -1,96 +1,51 @@
 # Mock Stock Exchange
 
-Web-based simulated multiplayer stock exchange for ~40–50 participants. Humans and AI agents trade fictional stocks through a real **order book** and **matching engine**. Executed trades determine the observed market price — news and mathematical models influence behaviour and expectations only.
+A web-based multiplayer trading simulation for ~40–50 participants. Humans trade fictional stocks against each other and against AI agents through a real **order book** and **matching engine**. Market prices come from **executed trades** — news and mathematical models shape behaviour and expectations, not arbitrary price overrides.
 
-> Source of truth: [`docs/MASTER_PLAN.pdf`](docs/MASTER_PLAN.pdf)
-
-**Repo:** https://github.com/ragingbul/mock-stock-exchange
+**Repo:** https://github.com/ragingbul/mock-stock-exchange  
+**Product spec:** [`docs/MASTER_PLAN.pdf`](docs/MASTER_PLAN.pdf)
 
 ---
 
-## Project approach
+## Overview
 
-We already have an existing mock stock exchange implementation.
+This is a full exchange simulation, not a simple price-clicking game. The backend implements order books, matching, settlement, AI traders, news, and portfolio accounting. The **participant terminal** is deliberately minimal: most users never need to see an order book.
 
-**Do not rebuild the project.** Read the existing code and docs first.
+**Design goal:** keep the sophisticated simulation intact while making the default experience simple enough for a first trade in under 30 seconds.
 
-Our goal is to keep the sophisticated backend market simulation while making the **participant experience extremely simple**.
+---
 
-### User experience change
+## For participants
 
-Participants should **not** need to understand:
+### Default workflow
 
-- order books
-- bid/ask mechanics
-- price-time priority
-- matching engines
-- limit orders
-- settlement mechanics
+**Select stock → enter quantity → BUY NOW or SELL NOW → confirm → see result → portfolio updates**
 
-The default participant workflow is:
+No order book, bid/ask, limit orders, or matching concepts are required for normal play.
 
-**Select stock → enter quantity → BUY NOW / SELL NOW → immediate execution → see result → portfolio updates**
+### What you see on the terminal
 
-The existing backend order-book and matching architecture remains in place. The simplified UI routes market orders through the same execution system. The market-maker / AI liquidity layer ensures normal participant market orders can execute immediately when the stock is open and risk checks pass.
+| Area | Label in the UI |
+|------|-----------------|
+| Stock | Stock name |
+| Last traded price | **Current price** |
+| Day change | **Percentage change** |
+| Trade history chart | Price chart (from real executions) |
+| Shares to trade | **Quantity** |
+| Instant trade | **BUY NOW** / **SELL NOW** |
+| Cash balance | **Available cash** |
+| Positions | **Holdings** |
+| Total worth | **Portfolio value** |
+| Gain/loss | **Current profit/loss** |
+| Your activity | **Your recent trades** |
+| Headlines | News feed |
+| Standings | **Leaderboard** |
 
-Limit orders remain available under **Advanced orders & order book** — they are not required for normal participation. There is no mandatory order-book UI on the main screen.
+**Advanced orders & order book** (optional): limit orders, bid/ask depth, and open orders — hidden until expanded.
 
-**Target:** a first-time participant should understand the interface and place their first trade in under 30 seconds.
+### After you trade
 
-### Participant interface
-
-The main terminal screen shows:
-
-| Shown to participants | Simple label |
-|----------------------|--------------|
-| Stock name | Stock name |
-| LTP | **Current price** |
-| % change | **Percentage change** |
-| Price chart | Simple price chart (from executed trades) |
-| Quantity input | **Quantity** |
-| Market buy/sell | **BUY NOW** / **SELL NOW** |
-| Cash | **Available cash** |
-| Holdings | **Holdings** |
-| Portfolio value | **Portfolio value** |
-| P&L | **Current profit/loss** |
-| User trades | **Your recent trades** |
-| News | Simple news feed |
-| Rankings | **Leaderboard** |
-
-Advanced information (limit orders, order book, open orders) is hidden under **Advanced orders & order book**.
-
-### Important: preserve the existing backend
-
-Do not duplicate or rewrite existing:
-
-- order-book logic (`backend/app/exchange/`)
-- matching engine
-- trade execution and settlement
-- AI trader system (`backend/app/ai/`)
-- news engine (`backend/app/services/news_service.py`)
-- market simulation (`backend/app/services/market_model.py`)
-- portfolio accounting (`backend/app/services/portfolio_service.py`)
-
-Inspect the implementation before changing behaviour. Only modify what is necessary.
-
-### Price authority
-
-The frontend is **never** authoritative for:
-
-- stock price
-- cash
-- holdings
-- P&L
-- execution price
-- trade ownership
-
-All of these are determined server-side via REST APIs and WebSocket updates.
-
-### Immediate market orders
-
-When a participant chooses TECHNOVA, BUY, 100 shares, and presses **BUY NOW**, the backend routes through `order_service` → matching engine → settlement, with `liquidity_service` provisioning MM quotes when the book is thin.
-
-The participant sees a human-readable summary, for example:
+A successful market order shows a plain summary, for example:
 
 ```
 ORDER EXECUTED
@@ -100,82 +55,17 @@ Average execution price: ₹104.35
 Total: ₹10,435
 ```
 
-If execution cannot happen, a simple reason is shown (not matching-engine jargon unless Advanced is open).
-
-### Keep advanced features
-
-The backend continues to support limit orders, order books, partial fills, market makers, AI traders, liquidity, and full matching — invisible to beginners until they open Advanced.
+If the order cannot fill, you get a short human-readable reason — not matching-engine jargon.
 
 ---
 
-## Architecture
+## For hosts
 
-```
-Human / AI decision
-        ↓
-Buy / Sell order  →  Order gateway (order_service)
-        ↓
-Order book
-        ↓
-Matching engine
-        ↓
-Executed trade → Settlement
-        ↓
-Last traded price → Market data → Terminals (WebSocket)
-```
-
-## Market simulation (backend only)
-
-These formulas drive AI expectations and reference behaviour. They are **not** shown to normal participants. Coefficients are configurable via environment / `backend/app/core/config.py` and `.env`.
-
-**Human trading pressure:**
-
-`P = (B − S) / (B + S)`
-
-**AI trading pressure:**
-
-`A = (AB − AS) / (AB + AS)`
-
-**Fundamental pressure:**
-
-`Fp = (F − R) / R`
-
-**Combined market pressure** (weights configurable):
-
-`M = 0.40·P + 0.25·N + 0.15·Fp + 0.20·A`
-
-**Reference price movement:**
-
-`R(t+1) = R(t) × (1 + k·M)`
-
-**News decay:**
-
-`I(t) = I₀ × e^(−λ·t)`
-
-**Fair-value correction:**
-
-`C = α(F − R)`
-
-**Last traded price** is updated only by executed trades in settlement — not by news or the UI directly.
-
-Event-style volatility knobs (optional, in `.env.example`): `MARKET_INTENSITY_MULTIPLIER`, `NEWS_PRESSURE_AMPLIFIER`, `MM_SPREAD_BPS`, `MM_QUOTE_SIZE`, etc.
-
----
-
-## Features
-
-- **Trading terminal** — minimal UI: **BUY NOW** / **SELL NOW**, chart, portfolio, news, leaderboard
-- **Advanced mode** — limit orders, order book, cancel open orders
-- **Admin panel** — bootstrap, session control, AI ticks, news, halt, leaderboard
-- **AI traders** — same order gateway as humans
-- **Leaderboard** — `GET /api/v1/leaderboard`
-- **Liquidity** — market-maker quotes for immediate participant fills
-
-## Quick start
+### Quick start
 
 ```bash
 cp .env.example .env
-# Without Docker, add:
+# Without Docker, add to .env:
 # DATABASE_URL=sqlite+pysqlite:///./backend/mse_dev.db
 
 cd backend
@@ -184,7 +74,7 @@ python -m venv .venv
 pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-# other terminal
+# second terminal
 cd frontend
 npm install
 npm run dev
@@ -196,24 +86,108 @@ npm run dev
 | Admin | http://localhost:3000/admin |
 | API docs | http://localhost:8000/docs |
 
-### Host an event (admin)
+### Run an event
 
-1. **Admin** → **Bootstrap market**
-2. **Run AI tick** (or run the demo script below)
-3. Optional: release news
-4. Share `http://<your-ip>:3000/terminal` with participants
+1. Open **Admin** → **Bootstrap market** (stocks, AI agents, liquidity, open session).
+2. Click **Run AI tick** a few times, or run the demo script below.
+3. Optionally release news from the admin panel.
+4. Share the terminal link with participants (`http://<your-ip>:3000/terminal` on the same network).
 
-### Trade as a participant
+### Simulate a busy market
 
-1. **Terminal** → name → **Start**
-2. Stock → quantity → **BUY NOW** or **SELL NOW** → confirm
-
-### Multi-trader demo
+Populates mock traders, releases mixed news, and drives AI activity for realistic charts and leaderboard movement:
 
 ```bash
 cd backend
 .\.venv\Scripts\python.exe scripts/run_demo_traders.py
 ```
+
+---
+
+## Architecture
+
+```
+Human / AI decision
+        ↓
+Order gateway (order_service)
+        ↓
+Order book
+        ↓
+Matching engine
+        ↓
+Settlement → last traded price
+        ↓
+Market data → terminals (REST + WebSocket)
+```
+
+Market orders from participants flow through the same path as AI orders. When the book is thin, `liquidity_service` posts market-maker quotes so normal **BUY NOW / SELL NOW** orders can execute immediately (subject to session status, halts, cash, and holdings checks).
+
+---
+
+## Design principles
+
+### Preserve the backend
+
+Do **not** rebuild or duplicate existing modules. Inspect and extend only where needed:
+
+| Module | Location |
+|--------|----------|
+| Order book & matching | `backend/app/exchange/` |
+| Order gateway | `backend/app/services/order_service.py` |
+| AI traders | `backend/app/ai/` |
+| News engine | `backend/app/services/news_service.py` |
+| Market model | `backend/app/services/market_model.py` |
+| Portfolio / P&L | `backend/app/services/portfolio_service.py` |
+
+Limit orders, partial fills, market makers, and full matching remain supported in the backend. They stay out of the default UI.
+
+### Price authority
+
+The frontend is never authoritative for stock price, cash, holdings, P&L, execution price, or trade ownership. All values come from the server via API and WebSocket updates.
+
+### Key rules
+
+1. The matching engine does not depend on AI, news, sentiment, UI, or charts.
+2. AI traders use the same order gateway as humans.
+3. News does not directly set last traded price (optional fair-value shift on release).
+4. Admin does not manually set stock prices.
+5. Coefficients and defaults live in config / environment — not hard-coded.
+
+---
+
+## Market simulation (backend)
+
+These formulas drive AI expectations and reference behaviour. They are **not shown to participants**. Weights and coefficients are configurable in `backend/app/core/config.py` and `.env`.
+
+| Concept | Formula |
+|---------|---------|
+| Human pressure | `P = (B − S) / (B + S)` |
+| AI pressure | `A = (AB − AS) / (AB + AS)` |
+| Fundamental pressure | `Fp = (F − R) / R` |
+| Combined pressure | `M = 0.40·P + 0.25·N + 0.15·Fp + 0.20·A` |
+| Reference price | `R(t+1) = R(t) × (1 + k·M)` |
+| News decay | `I(t) = I₀ × e^(−λ·t)` |
+| Fair-value correction | `C = α(F − R)` |
+
+**Last traded price** updates only when trades execute in settlement — not from news or the UI.
+
+### Event volatility (optional)
+
+For larger swings during live events (~30–40 news releases), tune `.env` (see `.env.example`):
+
+`MARKET_INTENSITY_MULTIPLIER`, `NEWS_PRESSURE_AMPLIFIER`, `MM_SPREAD_BPS`, `MM_QUOTE_SIZE`, `MARKET_NOISE_STD`, and related settings.
+
+---
+
+## Features
+
+- **Terminal** — BUY NOW / SELL NOW, chart, portfolio, news, leaderboard
+- **Advanced** — limit orders, order book, cancel open orders
+- **Admin** — bootstrap, session control, AI ticks, news, halts, leaderboard
+- **Leaderboard API** — `GET /api/v1/leaderboard`
+- **Liquidity** — market-maker quotes for immediate participant fills
+
+---
 
 ## Testing
 
@@ -222,43 +196,28 @@ cd backend
 pytest
 ```
 
-Coverage includes:
+The suite covers health, order book, matching, settlement, portfolio math, circuit limits, news decay, AI intents, and **immediate market-order execution** (`tests/test_market_orders.py`).
 
-- Health and settings
-- Order book and matching
-- Settlement and portfolio / P&L
-- Circuit limits on limit orders
-- News decay
-- **Immediate market-order execution** (`tests/test_market_orders.py`)
-- Cash, holdings, and execution summaries via API
-- AI intents and exchange integration
+Before changing behaviour, read the existing modules under `backend/app/exchange/`, `backend/app/ai/`, and `backend/app/services/`.
 
-Before changing code: inspect existing modules under `backend/app/exchange/`, `backend/app/ai/`, and `backend/app/services/`. Do not rebuild them.
+---
 
-## Phases
+## Project status
 
-| Phase | Focus | Status |
-|-------|-------|--------|
-| 0–14 | Foundation through load/simulation tests | Done |
+All planned phases (foundation through load/simulation tests) are complete.
 
-## Key design rules
-
-1. Matching engine does not depend on AI, news, sentiment, UI, or charts.
-2. AI traders use the same order gateway as humans.
-3. News does not directly set LTP (optional fair-value shift on release).
-4. Admin does not manually set stock prices.
-5. Configuration over hard-coding for weights, capital, circuits, ticks, and volatility.
+---
 
 ## Contributors
-
-Ordered list of project contributors:
 
 1. **Raghav Singh** — [GitHub](https://github.com/ragingbul) · [LinkedIn](https://www.linkedin.com/in/raghav-singh-b24064279)
 2. **Soumil Tiwary** — [GitHub](https://github.com/S0UMIL) · [LinkedIn](https://www.linkedin.com/in/soumiltiwary)
 3. **Ishan Dhawan** — [GitHub](https://github.com/ishan1818) · [LinkedIn](https://www.linkedin.com/in/ishan-dhawan-130a17351)
 
+---
+
 ## License
 
-This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for the full text.
+MIT License — see [LICENSE](LICENSE).
 
 Copyright (c) 2026 Mock Stock Exchange Contributors

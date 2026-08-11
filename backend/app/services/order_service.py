@@ -190,6 +190,16 @@ def submit_order(
     db.refresh(order)
     for t in trades:
         db.refresh(t)
+
+    # After sells, shrink/cancel stop-loss & take-profit tied to this position
+    if side == OrderSide.SELL and filled_qty > 0:
+        try:
+            from app.services import conditional_order_service
+
+            conditional_order_service.cancel_for_position_closed(db, trader_id, stock_id)
+        except Exception:
+            pass
+
     return order, trades
 
 

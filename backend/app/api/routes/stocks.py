@@ -2,13 +2,13 @@
 
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.schemas import StockCreate, StockRead
 from app.seed.stocks import seed_default_stocks
-from app.services import stock_service
+from app.services import sector_service, stock_service
 from app.services.stock_service import StockServiceError
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
@@ -23,7 +23,15 @@ def _to_stock_read(stock) -> StockRead:  # type: ignore[no-untyped-def]
         else Decimal("0")
     )
     data = StockRead.model_validate(stock)
-    return data.model_copy(update={"percent_change": pct.quantize(Decimal("0.0001"))})
+    sector = getattr(stock, "market_sector", None)
+    return data.model_copy(
+        update={
+            "percent_change": pct.quantize(Decimal("0.0001")),
+            "sector_id": stock.sector_id,
+            "sector_slug": sector.slug if sector else None,
+            "sector_name": sector.name if sector else None,
+        }
+    )
 
 
 @router.post("", response_model=StockRead, status_code=status.HTTP_201_CREATED)
@@ -32,12 +40,17 @@ def create_stock(payload: StockCreate, db: Session = Depends(get_db)) -> StockRe
         stock = stock_service.create_stock(db, payload)
     except StockServiceError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    # reload with sector relationship
+    stock = stock_service.get_stock(db, stock.id) or stock
     return _to_stock_read(stock)
 
 
 @router.get("", response_model=list[StockRead])
-def list_stocks(db: Session = Depends(get_db)) -> list[StockRead]:
-    return [_to_stock_read(s) for s in stock_service.list_stocks(db)]
+def list_stocks(
+    sector_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> list[StockRead]:
+    return [_to_stock_read(s) for s in stock_service.list_stocks(db, sector_id=sector_id)]
 
 
 @router.get("/{stock_id}", response_model=StockRead)
@@ -50,5 +63,7 @@ def get_stock(stock_id: int, db: Session = Depends(get_db)) -> StockRead:
 
 @router.post("/seed/defaults", status_code=status.HTTP_201_CREATED)
 def seed_stocks(db: Session = Depends(get_db)) -> dict:
+    sector_service.ensure_sectors(db)
     created = seed_default_stocks(db)
-    return {"created": created, "universe_size": 10}
+    backfilled = sector_service.backfill_stock_sectors(db)
+    return {"created": created, "universe_size": 10, "sectors_linked": backfilled}

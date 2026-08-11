@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Leaderboard, type LeaderboardRow } from "@/components/Leaderboard";
-import { apiGet, apiPost, apiUrl, getApiBaseUrl } from "@/lib/api";
+import { apiGet, apiPatch, apiPost, apiUrl, getApiBaseUrl } from "@/lib/api";
 
 type MarketStatus = {
   server_time_utc?: string;
@@ -12,6 +12,30 @@ type MarketStatus = {
   stocks_total?: number;
   ai_agents?: number;
   ai_agents_enabled?: number;
+};
+
+type SectorRow = {
+  id: number;
+  slug: string;
+  name: string;
+  stock_count?: number | null;
+};
+
+type SectorSummary = {
+  sector_id: number;
+  name: string;
+  stock_count: number;
+  sector_change_pct: string;
+  top_gainer: { ticker: string; percent_change: string } | null;
+  top_loser: { ticker: string; percent_change: string } | null;
+  stocks: Array<{ ticker: string; percent_change: string }>;
+};
+
+type StockRow = {
+  id: number;
+  ticker: string;
+  sector_id?: number | null;
+  sector_name?: string | null;
 };
 
 type AdminAction = {
@@ -38,18 +62,43 @@ export default function AdminPage() {
   const [impact, setImpact] = useState("0.75");
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(true);
+  const [sectors, setSectors] = useState<SectorRow[]>([]);
+  const [sectorSummaries, setSectorSummaries] = useState<SectorSummary[]>([]);
+  const [adminStocks, setAdminStocks] = useState<StockRow[]>([]);
+  const [assignStockId, setAssignStockId] = useState<number | "">("");
+  const [assignSectorId, setAssignSectorId] = useState<number | "">("");
+  const [finImpact, setFinImpact] = useState("-8");
+  const [techImpact, setTechImpact] = useState("-2");
+  const [simSettings, setSimSettings] = useState<Record<string, unknown> | null>(null);
+  const [ipoTicker, setIpoTicker] = useState("FTECH");
+  const [ipoName, setIpoName] = useState("FutureTech Ltd");
+  const [ipoPrice, setIpoPrice] = useState("100");
+  const [ipoLot, setIpoLot] = useState("50");
+  const [ipoTotal, setIpoTotal] = useState("1000");
+  const [ipoWin, setIpoWin] = useState("250");
+  const [ipoList, setIpoList] = useState<Array<Record<string, unknown>>>([]);
 
   const refreshOverview = useCallback(async (silent = false) => {
     try {
       await apiGet("/health");
       setApiOk(true);
-      const [ov, lb] = await Promise.all([
+      const [ov, lb, sec, sum, stk, sim, ipos] = await Promise.all([
         apiGet<Record<string, unknown>>("/admin/overview"),
         apiGet<LeaderboardRow[]>("/leaderboard"),
+        apiGet<SectorRow[]>("/sectors"),
+        apiGet<SectorSummary[]>("/market/sectors"),
+        apiGet<StockRow[]>("/stocks"),
+        apiGet<Record<string, unknown>>("/admin/simulation-settings").catch(() => null),
+        apiGet<Array<Record<string, unknown>>>("/ipos").catch(() => []),
       ]);
       setOverview(ov);
       setMarketStatus(ov as MarketStatus);
       setLeaderboard(lb);
+      setSectors(sec);
+      setSectorSummaries(sum);
+      setAdminStocks(stk);
+      setSimSettings(sim);
+      setIpoList(ipos);
       setLeaderboardLoading(false);
       if (!silent) setMsg("");
     } catch (e) {
@@ -127,8 +176,12 @@ export default function AdminPage() {
       run: () => apiPost("/admin/halt", { market_wide: true, halted: true }),
     },
     {
-      label: "Clear halt",
-      run: () => apiPost("/admin/halt", { market_wide: true, halted: false }),
+      label: "Start AI scheduler",
+      run: () => apiPost("/admin/ai/scheduler/start"),
+    },
+    {
+      label: "Stop AI scheduler",
+      run: () => apiPost("/admin/ai/scheduler/stop"),
     },
   ];
 
@@ -279,6 +332,18 @@ export default function AdminPage() {
             onChange={(e) => setImpact(e.target.value)}
             placeholder="impact 0-1"
           />
+          <input
+            className="border border-line bg-background px-2 py-2"
+            value={finImpact}
+            onChange={(e) => setFinImpact(e.target.value)}
+            placeholder="Financials impact %"
+          />
+          <input
+            className="border border-line bg-background px-2 py-2"
+            value={techImpact}
+            onChange={(e) => setTechImpact(e.target.value)}
+            placeholder="Technology impact %"
+          />
         </div>
         <button
           type="button"
@@ -295,18 +360,211 @@ export default function AdminPage() {
                   direction,
                   impact,
                   confidence: 0.9,
-                  duration_minutes: 20,
-                  decay_rate: 0.05,
+                  duration_minutes: 30,
+                  decay_rate: 0.02,
                   fundamental_impact_pct: direction * Number(impact) * 8,
+                  sector_impacts: {
+                    financials: Number(finImpact),
+                    technology: Number(techImpact),
+                  },
                 });
                 return apiPost(`/admin/news/${created.id}/release`);
               },
-              `Release news "${newsTitle}" for ${tickers}?`,
+              `Release news "${newsTitle}"?`,
             )
           }
         >
           {activeAction === "News" ? "Releasing news…" : "Create & release"}
         </button>
+      </section>
+
+      <section className="mt-8 border border-line bg-panel p-4">
+        <h2 className="font-mono text-sm uppercase text-muted">Simulation settings</h2>
+        {simSettings && (
+          <pre className="mt-2 overflow-auto font-mono text-xs text-muted">
+            {JSON.stringify(simSettings, null, 2)}
+          </pre>
+        )}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="border border-line px-3 py-2 font-mono text-xs hover:border-accent"
+            disabled={isBusy || apiOk === false}
+            onClick={() =>
+              runAction("Save sim settings", () =>
+                apiPatch("/admin/simulation-settings", {
+                  ai_tick_min_sec: 15,
+                  ai_tick_max_sec: 30,
+                  news_impact_tolerance_pct: 0.5,
+                  ai_aggressiveness: 1.2,
+                  news_reaction_strength: 1.2,
+                }),
+              )
+            }
+          >
+            Reset defaults (15–30s AI)
+          </button>
+        </div>
+      </section>
+
+      <section className="mt-8 border border-line bg-panel p-4">
+        <h2 className="font-mono text-sm uppercase text-muted">IPO management</h2>
+        <div className="mt-3 grid gap-2 md:grid-cols-3">
+          <input className="border border-line bg-background px-2 py-2" value={ipoName} onChange={(e) => setIpoName(e.target.value)} placeholder="Company" />
+          <input className="border border-line bg-background px-2 py-2" value={ipoTicker} onChange={(e) => setIpoTicker(e.target.value)} placeholder="Ticker" />
+          <input className="border border-line bg-background px-2 py-2" value={ipoPrice} onChange={(e) => setIpoPrice(e.target.value)} placeholder="Issue price" />
+          <input className="border border-line bg-background px-2 py-2" value={ipoLot} onChange={(e) => setIpoLot(e.target.value)} placeholder="Lot size" />
+          <input className="border border-line bg-background px-2 py-2" value={ipoTotal} onChange={(e) => setIpoTotal(e.target.value)} placeholder="Total lots" />
+          <input className="border border-line bg-background px-2 py-2" value={ipoWin} onChange={(e) => setIpoWin(e.target.value)} placeholder="Winning lots" />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="bg-accent px-3 py-2 font-mono text-xs text-black disabled:opacity-50"
+            disabled={isBusy || apiOk === false}
+            onClick={() =>
+              runAction("Create IPO", async () => {
+                const tech = sectors.find((s) => s.slug === "technology");
+                const created = await apiPost<Record<string, unknown>>("/admin/ipos", {
+                  company_name: ipoName,
+                  ticker: ipoTicker,
+                  sector_id: tech?.id,
+                  issue_price: ipoPrice,
+                  lot_size: Number(ipoLot),
+                  total_lots: Number(ipoTotal),
+                  winning_lots: Number(ipoWin),
+                  maximum_lots_per_user: 2,
+                  status: "draft",
+                });
+                await apiPost(`/admin/ipos/${created.id}/open`);
+                return created;
+              })
+            }
+          >
+            Create & open IPO
+          </button>
+        </div>
+        <ul className="mt-3 space-y-2 font-mono text-xs">
+          {ipoList.map((ipo) => (
+            <li key={String(ipo.id)} className="flex flex-wrap items-center gap-2 border-t border-line/50 py-2">
+              <span>
+                {String(ipo.ticker)} · {String(ipo.status)} · ₹{String(ipo.issue_price)}
+              </span>
+              <button type="button" className="border border-line px-2 py-1" onClick={() => runAction("Close IPO", () => apiPost(`/admin/ipos/${ipo.id}/close`))}>Close</button>
+              <button type="button" className="border border-line px-2 py-1" onClick={() => runAction("Allot IPO", () => apiPost(`/admin/ipos/${ipo.id}/allot`))}>Allot</button>
+              <button type="button" className="border border-line px-2 py-1" onClick={() => runAction("List IPO", () => apiPost(`/admin/ipos/${ipo.id}/list`))}>List</button>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="mt-8 border border-line bg-panel p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-mono text-sm uppercase text-muted">Sectors</h2>
+          <button
+            type="button"
+            disabled={isBusy || apiOk === false}
+            className="border border-line px-3 py-1 font-mono text-xs hover:border-accent disabled:opacity-50"
+            onClick={() =>
+              runAction("Seed sectors", () => apiPost("/admin/sectors/seed"))
+            }
+          >
+            Seed / link sectors
+          </button>
+        </div>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full font-mono text-xs">
+            <thead>
+              <tr className="text-left text-muted">
+                <th className="pb-2 pr-3">Sector</th>
+                <th className="pb-2 pr-3 text-right">Stocks</th>
+                <th className="pb-2 pr-3 text-right">Change</th>
+                <th className="pb-2 pr-3">Top gainer</th>
+                <th className="pb-2">Top loser</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sectorSummaries.map((row) => (
+                <tr key={row.sector_id} className="border-t border-line/60">
+                  <td className="py-2 pr-3">{row.name}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums">{row.stock_count}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums">
+                    {Number(row.sector_change_pct) > 0 ? "+" : ""}
+                    {Number(row.sector_change_pct).toFixed(2)}%
+                  </td>
+                  <td className="py-2 pr-3 text-accent">
+                    {row.top_gainer
+                      ? `${row.top_gainer.ticker} ${Number(row.top_gainer.percent_change) > 0 ? "+" : ""}${Number(row.top_gainer.percent_change).toFixed(2)}%`
+                      : "—"}
+                  </td>
+                  <td className="py-2 text-warn">
+                    {row.top_loser
+                      ? `${row.top_loser.ticker} ${Number(row.top_loser.percent_change).toFixed(2)}%`
+                      : "—"}
+                  </td>
+                </tr>
+              ))}
+              {!sectorSummaries.length && (
+                <tr>
+                  <td colSpan={5} className="py-3 text-muted">
+                    Bootstrap market or seed sectors to populate.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-4 grid gap-2 md:grid-cols-3">
+          <select
+            className="border border-line bg-background px-2 py-2 font-mono text-xs"
+            value={assignStockId}
+            onChange={(e) =>
+              setAssignStockId(e.target.value ? Number(e.target.value) : "")
+            }
+          >
+            <option value="">Select stock…</option>
+            {adminStocks.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.ticker}
+                {s.sector_name ? ` (${s.sector_name})` : ""}
+              </option>
+            ))}
+          </select>
+          <select
+            className="border border-line bg-background px-2 py-2 font-mono text-xs"
+            value={assignSectorId}
+            onChange={(e) =>
+              setAssignSectorId(e.target.value ? Number(e.target.value) : "")
+            }
+          >
+            <option value="">Assign sector…</option>
+            {sectors.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={
+              isBusy || apiOk === false || !assignStockId || !assignSectorId
+            }
+            className="border border-line bg-panel px-3 py-2 font-mono text-xs hover:border-accent disabled:opacity-50"
+            onClick={() =>
+              runAction("Assign sector", async () => {
+                const result = await apiPatch(
+                  `/admin/stocks/${assignStockId}/sector`,
+                  { sector_id: assignSectorId },
+                );
+                await refreshOverview(true);
+                return result;
+              })
+            }
+          >
+            Assign sector
+          </button>
+        </div>
       </section>
 
       <section className="mt-8 border border-line bg-panel p-4">

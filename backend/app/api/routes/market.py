@@ -1,11 +1,11 @@
-"""Public news + leaderboard routes."""
+"""Public news + leaderboard + sector market views."""
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.schemas.orders import NewsRead
-from app.services import leaderboard_service, news_service
+from app.services import leaderboard_service, news_service, sector_service
 from app.services.news_service import effective_impact
 
 router = APIRouter(tags=["market"])
@@ -18,6 +18,16 @@ def public_news(db: Session = Depends(get_db)) -> list[NewsRead]:
         read = NewsRead.model_validate(event)
         out.append(read.model_copy(update={"effective_impact": effective_impact(event)}))
     return out
+
+
+@router.get("/news/{news_id}")
+def news_detail(news_id: int, db: Session = Depends(get_db)) -> dict:
+    event = news_service.get_news(db, news_id)
+    if event is None or not event.is_released:
+        from fastapi import HTTPException
+
+        raise HTTPException(404, "news not found")
+    return news_service.news_detail_dict(event)
 
 
 @router.get("/leaderboard")
@@ -35,3 +45,9 @@ def leaderboard(db: Session = Depends(get_db)) -> list[dict]:
         }
         for r in rows
     ]
+
+
+@router.get("/market/sectors")
+def market_sectors(db: Session = Depends(get_db)) -> list[dict]:
+    """Stocks grouped by sector with performance summary."""
+    return sector_service.sector_summary(db)

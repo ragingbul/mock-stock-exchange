@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.schemas import HoldingAdjust, HoldingRead, PortfolioRead, TraderCreate, TraderRead
+from app.schemas import HoldingAdjust, HoldingRead, PortfolioRead, TraderCreate, TraderRead, WalletRead
 from app.services import portfolio_service, trader_service
 from app.services.trader_service import TraderServiceError
 
@@ -39,6 +39,14 @@ def get_trader(trader_id: int, db: Session = Depends(get_db)) -> TraderRead:
 def get_portfolio(trader_id: int, db: Session = Depends(get_db)) -> PortfolioRead:
     try:
         return portfolio_service.get_portfolio(db, trader_id)
+    except TraderServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/{trader_id}/wallet", response_model=WalletRead)
+def get_wallet(trader_id: int, db: Session = Depends(get_db)) -> WalletRead:
+    try:
+        return portfolio_service.get_wallet(db, trader_id)
     except TraderServiceError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 

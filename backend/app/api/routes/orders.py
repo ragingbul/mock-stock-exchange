@@ -58,6 +58,22 @@ async def create_order(payload: OrderCreate, db: Session = Depends(get_db)) -> d
         "PRICE_UPDATED",
         {"stock_id": order.stock_id, "trades": trade_payload},
     )
+    await manager.broadcast(
+        "PORTFOLIO_UPDATED",
+        {"trader_id": payload.trader_id, "stock_id": order.stock_id},
+    )
+    await manager.broadcast("WALLET_UPDATED", {"trader_id": payload.trader_id})
+
+    # Evaluate stop-loss / take-profit after price moves
+    if trades:
+        from app.services import conditional_order_service
+
+        for ev in conditional_order_service.evaluate_conditionals_for_stock(db, order.stock_id):
+            await manager.broadcast(ev.get("event", "CONDITIONAL_UPDATED"), ev)
+            if ev.get("trader_id"):
+                await manager.broadcast("WALLET_UPDATED", {"trader_id": ev["trader_id"]})
+                await manager.broadcast("PORTFOLIO_UPDATED", {"trader_id": ev["trader_id"]})
+
     return {
         "order": OrderRead.model_validate(order).model_dump(mode="json"),
         "trades": trade_payload,

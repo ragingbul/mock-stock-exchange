@@ -6,7 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Enum, Numeric, String, Text, func
+from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -19,6 +19,7 @@ from app.models.enums import (
 
 if TYPE_CHECKING:
     from app.models.holding import Holding
+    from app.models.sector import MarketSector
 
 
 class Stock(Base):
@@ -27,8 +28,15 @@ class Stock(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     ticker: Mapped[str] = mapped_column(String(16), unique=True, index=True)
     company_name: Mapped[str] = mapped_column(String(128))
+    # Legacy enum code (kept for news matching + existing APIs)
     sector: Mapped[Sector] = mapped_column(
         Enum(Sector, name="sector", native_enum=False)
+    )
+    # First-class sector relationship (Layer 1)
+    sector_id: Mapped[int | None] = mapped_column(
+        ForeignKey("sectors.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     starting_price: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
     last_traded_price: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
@@ -53,3 +61,6 @@ class Stock(Base):
     )
 
     holdings: Mapped[list[Holding]] = relationship("Holding", back_populates="stock")
+    market_sector: Mapped[MarketSector | None] = relationship(
+        "MarketSector", back_populates="stocks"
+    )

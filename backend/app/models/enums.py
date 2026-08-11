@@ -40,6 +40,8 @@ class MarketSessionStatus(str, Enum):
 
 
 class Sector(str, Enum):
+    """Legacy stock sector codes — mapped to MarketSector rows via slug."""
+
     TECH = "tech"
     AUTO = "auto"
     ENERGY = "energy"
@@ -49,3 +51,13 @@ class Sector(str, Enum):
     INFRA = "infra"
     FOOD = "food"
     DATA = "data"
+    # Spec aliases (optional; preferred path is MarketSector.slug)
+    FINANCIALS = "financials"
+    TECHNOLOGY = "technology"
+    HEALTHCARE = "healthcare"
+    CONSUMER = "consumer"
+    INDUSTRIALS = "industrials"
+    REAL_ESTATE = "real_estate"
+    UTILITIES = "utilities"
+    TELECOM = "telecom"
+    AUTOMOTIVE = "automotive"

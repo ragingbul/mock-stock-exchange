@@ -15,9 +15,12 @@ from app.models.order_enums import OrderStatus
 from app.models import Order, Trade, Trader
 from app.realtime.ws_manager import manager
 from app.schemas.orders import HaltRequest, NewsCreate, NewsRead, SessionUpdate
-from app.services import news_service, order_service, stock_service
+from app.schemas import SectorAssign
+from app.services import news_service, order_service, sector_service, stock_service
 from app.services.liquidity_service import seed_all_liquidity
 from app.services.news_service import effective_impact
+from app.services.sector_service import SectorServiceError
+from app.api.routes.stocks import _to_stock_read
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -108,7 +111,8 @@ async def halt(payload: HaltRequest, db: Session = Depends(get_db)) -> dict:
 
 @router.post("/news", response_model=NewsRead)
 def create_news(payload: NewsCreate, db: Session = Depends(get_db)) -> NewsRead:
-    event = news_service.create_news(db, **payload.model_dump())
+    data = payload.model_dump()
+    event = news_service.create_news(db, **data)
     return NewsRead.model_validate(event)
 
 
@@ -118,22 +122,66 @@ async def release_news(event_id: int, db: Session = Depends(get_db)) -> NewsRead
         event = news_service.release_news(db, event_id)
     except ValueError as exc:
         raise HTTPException(404, str(exc)) from exc
+    detail = news_service.news_detail_dict(event)
     read = NewsRead.model_validate(event)
     read = read.model_copy(update={"effective_impact": effective_impact(event)})
-    await manager.broadcast(
-        "NEWS_RELEASED",
-        read.model_dump(mode="json"),
-    )
+    await manager.broadcast("NEWS_RELEASED", detail)
     return read
+
+
+@router.post("/news/{event_id}/cancel")
+def cancel_news(event_id: int, db: Session = Depends(get_db)) -> dict:
+    try:
+        event = news_service.cancel_news(db, event_id)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"id": event.id, "status": event.status}
 
 
 @router.get("/news", response_model=list[NewsRead])
 def list_news(db: Session = Depends(get_db)) -> list[NewsRead]:
     out = []
-    for event in news_service.list_news(db):
+    for event in news_service.list_news(db, include_scheduled=True):
         read = NewsRead.model_validate(event)
         out.append(read.model_copy(update={"effective_impact": effective_impact(event)}))
     return out
+
+
+@router.get("/simulation-settings")
+def get_sim_settings(db: Session = Depends(get_db)) -> dict:
+    from app.services.simulation_settings_service import get_or_create_settings, settings_dict
+
+    return settings_dict(get_or_create_settings(db))
+
+
+@router.patch("/simulation-settings")
+def patch_sim_settings(payload: dict, db: Session = Depends(get_db)) -> dict:
+    from app.services.simulation_settings_service import settings_dict, update_settings
+    from app.schemas.orders import SimulationSettingsUpdate
+
+    parsed = SimulationSettingsUpdate.model_validate(payload)
+    row = update_settings(db, **parsed.model_dump(exclude_unset=True))
+    return settings_dict(row)
+
+
+@router.post("/ai/scheduler/start")
+def start_ai_scheduler(db: Session = Depends(get_db)) -> dict:
+    from app.services import ai_scheduler
+    from app.services.simulation_settings_service import update_settings
+
+    update_settings(db, ai_scheduler_enabled=True)
+    ai_scheduler.start_scheduler()
+    return {"ok": True, **ai_scheduler.scheduler_status()}
+
+
+@router.post("/ai/scheduler/stop")
+def stop_ai_scheduler(db: Session = Depends(get_db)) -> dict:
+    from app.services import ai_scheduler
+    from app.services.simulation_settings_service import update_settings
+
+    update_settings(db, ai_scheduler_enabled=False)
+    ai_scheduler.stop_scheduler()
+    return {"ok": True, **ai_scheduler.scheduler_status()}
 
 
 @router.get("/overview")
@@ -191,14 +239,44 @@ def bootstrap(db: Session = Depends(get_db)) -> dict:
     db.add(session)
     db.flush()
 
+    sectors_created = sector_service.seed_default_sectors(db)
     stocks = seed_default_stocks(db)
+    linked = sector_service.backfill_stock_sectors(db)
     agents = ai_runner.seed_default_agents(db)
     liquidity_quotes = seed_all_liquidity(db)
     db.commit()
     db.refresh(session)
     return {
+        "sectors_created": sectors_created,
         "stocks_created": stocks,
+        "stocks_sector_linked": linked,
         "agents_created": agents,
         "liquidity_quotes": liquidity_quotes,
         "session_id": session.id,
     }
+
+
+@router.patch("/stocks/{stock_id}/sector")
+def admin_assign_sector(
+    stock_id: int,
+    payload: SectorAssign,
+    db: Session = Depends(get_db),
+) -> dict:
+    try:
+        stock = sector_service.assign_stock_sector(
+            db,
+            stock_id,
+            sector_id=payload.sector_id,
+            sector_slug=payload.sector_slug,
+        )
+    except SectorServiceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    stock = stock_service.get_stock(db, stock.id) or stock
+    return {"stock": _to_stock_read(stock).model_dump(mode="json")}
+
+
+@router.post("/sectors/seed")
+def admin_seed_sectors(db: Session = Depends(get_db)) -> dict:
+    created = sector_service.seed_default_sectors(db)
+    linked = sector_service.backfill_stock_sectors(db)
+    return {"sectors_created": created, "stocks_linked": linked}

@@ -63,6 +63,11 @@ class Settings(BaseSettings):
     market_noise_std: float = 0.08
     market_news_weight: float = 0.45
 
+    ai_tick_min_sec: float = 15.0
+    ai_tick_max_sec: float = 30.0
+    news_impact_tolerance_pct: float = 0.5
+    news_combined_impact_cap_pct: float = 20.0
+
     @property
     def database_url(self) -> str:
         """SQLAlchemy database URL."""

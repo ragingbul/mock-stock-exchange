@@ -5,7 +5,18 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import admin, health, market, orders, stocks, traders, ws
+from app.api.routes import (
+    admin,
+    conditionals,
+    health,
+    ipos,
+    market,
+    orders,
+    sectors,
+    stocks,
+    traders,
+    ws,
+)
 from app.core.config import get_settings
 from app.core.database import check_database_connection, init_db
 
@@ -14,7 +25,11 @@ from app.core.database import check_database_connection, init_db
 async def lifespan(_app: FastAPI):
     if check_database_connection():
         init_db()
+    from app.services import ai_scheduler
+
+    ai_scheduler.start_scheduler()
     yield
+    ai_scheduler.stop_scheduler()
 
 
 def create_app() -> FastAPI:
@@ -27,7 +42,7 @@ def create_app() -> FastAPI:
             "Order books and the matching engine discover prices; "
             "models and news influence trader behaviour only."
         ),
-        version="1.0.0",
+        version="2.0.0",
         docs_url="/docs",
         redoc_url="/redoc",
         lifespan=lifespan,
@@ -45,7 +60,10 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix=prefix)
     app.include_router(traders.router, prefix=prefix)
     app.include_router(stocks.router, prefix=prefix)
+    app.include_router(sectors.router, prefix=prefix)
     app.include_router(orders.router, prefix=prefix)
+    app.include_router(conditionals.router, prefix=prefix)
+    app.include_router(ipos.router, prefix=prefix)
     app.include_router(market.router, prefix=prefix)
     app.include_router(admin.router, prefix=prefix)
     app.include_router(ws.router, prefix=prefix)

@@ -34,6 +34,9 @@ class Trader(Base):
     )
     starting_capital: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     cash: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    cash_blocked_ipo: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2), nullable=False, default=Decimal("0.00")
+    )
     realized_pnl: Mapped[Decimal] = mapped_column(
         Numeric(18, 2), nullable=False, default=Decimal("0.00")
     )
