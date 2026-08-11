@@ -383,3 +383,53 @@ def test_book_rebuild_from_db(db_session):
 def test_get_book_unknown_stock_returns_404(client):
     res = client.get("/api/v1/market/99999/book")
     assert res.status_code == 404
+
+
+def test_start_session_closes_prior_open_sessions(client):
+    first = client.post("/api/v1/admin/session/start", params={"name": "A"})
+    second = client.post("/api/v1/admin/session/start", params={"name": "B"})
+    assert first.status_code == 200
+    assert second.status_code == 200
+
+    first_id = first.json()["id"]
+    second_id = second.json()["id"]
+    assert second_id > first_id
+
+    overview = client.get("/api/v1/admin/overview").json()
+    assert overview["session_id"] == second_id
+    assert overview["session_status"] == "open"
+
+
+def test_bootstrap_is_idempotent(client):
+    books.clear()
+    first = client.post("/api/v1/admin/bootstrap")
+    second = client.post("/api/v1/admin/bootstrap")
+    assert first.status_code == 200
+    assert second.status_code == 200
+
+    first_body = first.json()
+    second_body = second.json()
+    assert first_body["stocks_created"] > 0
+    assert first_body["agents_created"] > 0
+    assert first_body["liquidity_quotes"] > 0
+
+    assert second_body["stocks_created"] == 0
+    assert second_body["agents_created"] == 0
+    assert second_body["already_bootstrapped"] is True
+    assert second_body["session_reused"] is True
+    assert second_body["session_id"] == first_body["session_id"]
+    assert second_body["liquidity_quotes"] == 0
+
+
+def test_bootstrap_resumes_paused_session(client):
+    books.clear()
+    boot = client.post("/api/v1/admin/bootstrap").json()
+    client.post("/api/v1/admin/session/pause")
+    resumed = client.post("/api/v1/admin/bootstrap").json()
+
+    assert resumed["already_bootstrapped"] is True
+    assert resumed["session_reused"] is True
+    assert resumed["session_id"] == boot["session_id"]
+
+    overview = client.get("/api/v1/admin/overview").json()
+    assert overview["session_status"] == "open"
