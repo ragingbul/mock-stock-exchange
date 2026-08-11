@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { apiGet } from "@/lib/api";
+import { apiGet, getApiBaseUrl } from "@/lib/api";
 
 type HealthResponse = {
   status: string;
@@ -48,7 +48,7 @@ export default function Home() {
       </div>
       <p className="mt-8 font-mono text-xs text-muted">
         API {health ? `phase ${health.phase} · ${health.status}` : "offline"} ·{" "}
-        <a className="underline" href="http://localhost:8000/docs">
+        <a className="underline" href={`${getApiBaseUrl()}/docs`}>
           docs
         </a>
       </p>

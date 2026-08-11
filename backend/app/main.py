@@ -7,13 +7,19 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import admin, health, market, orders, stocks, traders, ws
 from app.core.config import get_settings
-from app.core.database import check_database_connection, init_db
+from app.core.database import SessionLocal, check_database_connection, init_db
+from app.exchange.book_registry import books
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     if check_database_connection():
         init_db()
+        db = SessionLocal()
+        try:
+            books.rebuild_from_db(db)
+        finally:
+            db.close()
     yield
 
 

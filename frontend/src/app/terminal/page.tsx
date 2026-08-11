@@ -164,45 +164,79 @@ export default function TerminalPage() {
 
   useEffect(() => {
     let ws: WebSocket | null = null;
-    try {
-      ws = new WebSocket(wsUrl());
-      ws.onmessage = (ev) => {
-        try {
-          const msg = JSON.parse(ev.data);
-          setStatus(msg.event ?? "EVENT");
-          if (
-            msg.event === "TRADE_EXECUTED" ||
-            msg.event === "ORDER_BOOK_UPDATED" ||
-            msg.event === "PRICE_UPDATED" ||
-            msg.event === "NEWS_RELEASED" ||
-            msg.event === "PORTFOLIO_UPDATED"
-          ) {
-            refresh();
+    let reconnectTimer: number | null = null;
+    let unmounted = false;
+    let attempt = 0;
+
+    function connect() {
+      if (unmounted) return;
+      try {
+        ws = new WebSocket(wsUrl());
+        ws.onmessage = (ev) => {
+          try {
+            const msg = JSON.parse(ev.data);
+            setStatus(msg.event ?? "EVENT");
+            if (
+              msg.event === "TRADE_EXECUTED" ||
+              msg.event === "ORDER_BOOK_UPDATED" ||
+              msg.event === "PRICE_UPDATED" ||
+              msg.event === "NEWS_RELEASED" ||
+              msg.event === "PORTFOLIO_UPDATED" ||
+              msg.event === "MARKET_HALTED"
+            ) {
+              refresh();
+            }
+          } catch {
+            /* ignore */
           }
-        } catch {
-          /* ignore */
+        };
+        ws.onopen = () => {
+          attempt = 0;
+          setStatus("LIVE");
+        };
+        ws.onclose = () => {
+          setStatus("OFF");
+          if (!unmounted) {
+            const delay = Math.min(1000 * 2 ** attempt, 30_000);
+            attempt += 1;
+            reconnectTimer = window.setTimeout(connect, delay);
+          }
+        };
+      } catch {
+        setStatus("OFF");
+        if (!unmounted) {
+          reconnectTimer = window.setTimeout(connect, 5000);
         }
-      };
-      ws.onopen = () => setStatus("LIVE");
-      ws.onclose = () => setStatus("OFF");
-    } catch {
-      setStatus("OFF");
+      }
     }
-    return () => ws?.close();
+
+    connect();
+    return () => {
+      unmounted = true;
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+      ws?.close();
+    };
   }, [refresh]);
 
   useEffect(() => {
     const saved = localStorage.getItem("mse_trader_id");
-    if (saved) setTraderId(Number(saved));
+    if (saved) {
+      const id = Number(saved);
+      if (Number.isFinite(id) && id > 0) setTraderId(id);
+    }
   }, []);
 
   async function join() {
-    const created = await apiPost<{ id: number }>("/traders", {
-      name: traderName || "Trader",
-    });
-    setTraderId(created.id);
-    localStorage.setItem("mse_trader_id", String(created.id));
-    await refresh();
+    try {
+      const created = await apiPost<{ id: number }>("/traders", {
+        name: traderName || "Trader",
+      });
+      setTraderId(created.id);
+      localStorage.setItem("mse_trader_id", String(created.id));
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not join");
+    }
   }
 
   async function executeMarketOrder(side: "buy" | "sell") {
@@ -276,8 +310,17 @@ export default function TerminalPage() {
   }
 
   async function cancelOrder(id: number) {
-    await apiDelete(`/orders/${id}?trader_id=${traderId}`);
-    await refresh();
+    try {
+      await apiDelete(`/orders/${id}?trader_id=${traderId}`);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not cancel order");
+    }
+  }
+
+  function updateQty(raw: string) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) setQty(Math.floor(n));
   }
 
   const panel = "border border-white/15";
@@ -394,7 +437,7 @@ export default function TerminalPage() {
               className={`${inputCls} mt-1`}
               value={qty}
               min={1}
-              onChange={(e) => setQty(Number(e.target.value))}
+              onChange={(e) => updateQty(e.target.value)}
             />
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button
@@ -487,7 +530,7 @@ export default function TerminalPage() {
                   </button>
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-2">
-                  <input type="number" className={inputCls} value={qty} onChange={(e) => setQty(Number(e.target.value))} />
+                  <input type="number" className={inputCls} value={qty} onChange={(e) => updateQty(e.target.value)} />
                   <input className={inputCls} value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} />
                 </div>
                 <button

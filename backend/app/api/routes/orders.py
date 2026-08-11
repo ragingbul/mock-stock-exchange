@@ -113,6 +113,8 @@ def list_trades(
 
 
 @router.get("/market/{stock_id}/book", response_model=OrderBookRead)
-def get_book(stock_id: int) -> OrderBookRead:
+def get_book(stock_id: int, db: Session = Depends(get_db)) -> OrderBookRead:
+    if db.get(Stock, stock_id) is None:
+        raise HTTPException(status_code=404, detail="stock not found")
     depth = books.get(stock_id).depth()
     return OrderBookRead(stock_id=stock_id, **depth)

@@ -14,9 +14,9 @@ from app.models.enums import MarketSessionStatus, TraderType
 from app.models.order_enums import OrderStatus
 from app.models import Order, Trade, Trader
 from app.realtime.ws_manager import manager
-from app.schemas.orders import HaltRequest, NewsCreate, NewsRead, SessionUpdate
-from app.services import news_service, order_service, stock_service
-from app.services.liquidity_service import seed_all_liquidity
+from app.schemas.orders import HaltRequest, NewsCreate, NewsRead
+from app.services import news_service, order_service, stock_service, session_service
+from app.services.liquidity_service import seed_all_liquidity, seed_liquidity_if_needed
 from app.services.news_service import effective_impact
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -50,12 +50,7 @@ def _market_status(db: Session) -> dict:
 
 @router.post("/session/start")
 async def start_session(name: str = "Live Session", db: Session = Depends(get_db)) -> dict:
-    session = MarketSession(
-        name=name,
-        status=MarketSessionStatus.OPEN,
-        started_at=datetime.now(timezone.utc),
-    )
-    db.add(session)
+    session = session_service.open_session(db, name)
     db.commit()
     db.refresh(session)
     await manager.broadcast("MARKET_HALTED", {"halted": False, "status": "open"})
@@ -64,9 +59,7 @@ async def start_session(name: str = "Live Session", db: Session = Depends(get_db
 
 @router.post("/session/pause")
 async def pause_session(db: Session = Depends(get_db)) -> dict:
-    from sqlalchemy import select
-
-    session = db.scalar(select(MarketSession).order_by(MarketSession.id.desc()).limit(1))
+    session = session_service.get_active_session(db)
     if not session:
         raise HTTPException(404, "no session")
     session.status = MarketSessionStatus.PAUSED
@@ -77,9 +70,7 @@ async def pause_session(db: Session = Depends(get_db)) -> dict:
 
 @router.post("/session/resume")
 async def resume_session(db: Session = Depends(get_db)) -> dict:
-    from sqlalchemy import select
-
-    session = db.scalar(select(MarketSession).order_by(MarketSession.id.desc()).limit(1))
+    session = session_service.get_active_session(db)
     if not session:
         raise HTTPException(404, "no session")
     session.status = MarketSessionStatus.OPEN
@@ -180,25 +171,33 @@ def ai_tick(db: Session = Depends(get_db)) -> dict:
 
 
 @router.post("/bootstrap")
-def bootstrap(db: Session = Depends(get_db)) -> dict:
+async def bootstrap(db: Session = Depends(get_db)) -> dict:
     from app.seed.stocks import seed_default_stocks
 
-    session = MarketSession(
-        name="Bootstrapped Session",
-        status=MarketSessionStatus.OPEN,
-        started_at=datetime.now(timezone.utc),
+    stocks_created = seed_default_stocks(db)
+    agents_created = ai_runner.seed_default_agents(db)
+    has_stocks = len(stock_service.list_stocks(db)) > 0
+    already_bootstrapped = (
+        has_stocks and stocks_created == 0 and agents_created == 0
     )
-    db.add(session)
-    db.flush()
 
-    stocks = seed_default_stocks(db)
-    agents = ai_runner.seed_default_agents(db)
-    liquidity_quotes = seed_all_liquidity(db)
+    if already_bootstrapped:
+        session, reused = session_service.ensure_open_session(db, "Bootstrapped Session")
+        liquidity_quotes = seed_liquidity_if_needed(db)
+    else:
+        session = session_service.open_session(db, "Bootstrapped Session")
+        liquidity_quotes = seed_all_liquidity(db)
+        reused = False
+
     db.commit()
     db.refresh(session)
-    return {
-        "stocks_created": stocks,
-        "agents_created": agents,
+    payload = {
+        "stocks_created": stocks_created,
+        "agents_created": agents_created,
         "liquidity_quotes": liquidity_quotes,
         "session_id": session.id,
+        "already_bootstrapped": already_bootstrapped,
+        "session_reused": reused,
     }
+    await manager.broadcast("MARKET_HALTED", {"halted": False, "status": "open"})
+    return payload

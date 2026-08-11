@@ -1,8 +1,12 @@
 """WebSocket endpoint."""
 
+import logging
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.realtime.ws_manager import manager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["realtime"])
 
@@ -18,4 +22,5 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     except WebSocketDisconnect:
         await manager.disconnect(websocket)
     except Exception:
+        logger.exception("websocket connection error")
         await manager.disconnect(websocket)

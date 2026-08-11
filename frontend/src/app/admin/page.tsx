@@ -213,7 +213,7 @@ export default function AdminPage() {
         <div className="mt-4 border border-warn bg-panel p-3 text-sm text-warn">
           Start the API with:
           <code className="ml-1 block mt-1 font-mono text-xs">
-            cd backend &amp; .\.venv\Scripts\uvicorn.exe app.main:app --host 0.0.0.0 --port 8000
+            cd backend &amp;&amp; uvicorn app.main:app --host 0.0.0.0 --port 8000
           </code>
         </div>
       )}
