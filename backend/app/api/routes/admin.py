@@ -14,7 +14,7 @@ from app.models.enums import MarketSessionStatus, TraderType
 from app.models.order_enums import OrderStatus
 from app.models import Order, Trade, Trader
 from app.realtime.ws_manager import manager
-from app.schemas.orders import HaltRequest, NewsCreate, NewsRead, SessionUpdate
+from app.schemas.orders import HaltRequest, NewsCreate, NewsRead
 from app.services import news_service, order_service, stock_service
 from app.services.liquidity_service import seed_all_liquidity
 from app.services.news_service import effective_impact

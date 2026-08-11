@@ -1,12 +1,15 @@
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
 const REQUEST_TIMEOUT_MS = 30_000;
 
-/** Resolve API base URL: same host as the page, port 8000 (works for localhost + LAN). */
+/** Resolve API base URL from env, falling back to same host as the page on port 8000. */
 export function getApiBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "");
+  }
   if (typeof window !== "undefined") {
     return `http://${window.location.hostname}:8000`;
   }
-  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+  return "http://localhost:8000";
 }
 
 export function apiUrl(path: string): string {
@@ -15,7 +18,7 @@ export function apiUrl(path: string): string {
 }
 
 export function wsUrl(): string {
-  const base = getApiBaseUrl().replace(/^http/, "ws");
+  const base = getApiBaseUrl().replace(/^https/, "wss").replace(/^http/, "ws");
   return `${base}${API_PREFIX}/ws`;
 }
 
@@ -42,7 +45,17 @@ async function parseError(res: Response): Promise<string> {
   const text = await res.text();
   try {
     const json = JSON.parse(text);
-    if (json.detail) return String(json.detail);
+    if (json.detail) {
+      if (Array.isArray(json.detail)) {
+        return json.detail
+          .map((item: { loc?: unknown[]; msg?: string }) => {
+            const loc = Array.isArray(item.loc) ? item.loc.join(".") : "";
+            return loc ? `${loc}: ${item.msg ?? "validation error"}` : String(item.msg ?? item);
+          })
+          .join("; ");
+      }
+      return String(json.detail);
+    }
   } catch {
     /* use raw text */
   }
