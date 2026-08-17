@@ -1,0 +1,16 @@
+.git
+.env
+.env.*
+!.env.example
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/node_modules
+**/.next
+**/*.db
+.cursor
+*.md
+!OCI_DEPLOYMENT.md
+nginx/certs/*.pem
+nginx/certs/*.key

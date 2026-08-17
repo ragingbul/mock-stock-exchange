@@ -8,12 +8,15 @@ function isProductionBuild(): boolean {
   return process.env.NODE_ENV === "production";
 }
 
-/** Resolve API base URL: env override, else dev fallback on port 8000. */
+/** Resolve API base URL: env override, same-origin in prod browser, else dev fallback. */
 export function getApiBaseUrl(): string {
   const envUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
   if (envUrl) return envUrl;
   if (isProductionBuild()) {
-    throw new Error("NEXT_PUBLIC_API_URL must be set in production");
+    if (typeof window !== "undefined") {
+      return window.location.origin;
+    }
+    return "http://localhost";
   }
   if (typeof window !== "undefined") {
     return `http://${window.location.hostname}:8000`;

@@ -2,6 +2,10 @@
 
 See also [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) for the full pre-event checklist.
 
+**Local LAN server (laptop hosts event):** see [LOCAL_SERVER.md](LOCAL_SERVER.md) — HTTP on port 80, same Wi‑Fi participants.
+
+**Oracle Cloud Always Free (₹0 / $0):** see [OCI_DEPLOYMENT.md](OCI_DEPLOYMENT.md) for Docker Compose + Nginx + PostgreSQL on a single Ubuntu VM.
+
 ## Architecture audit (Railway target)
 
 | Layer | Component | Notes |
