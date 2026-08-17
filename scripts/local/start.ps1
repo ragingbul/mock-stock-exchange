@@ -7,7 +7,7 @@ Set-Location $RootDir
 $Compose = "docker compose -f docker-compose.local.yml"
 
 if (-not (Test-Path ".env")) {
-    Write-Error "Missing .env — copy .env.local.example to .env and configure."
+    Write-Error "Missing .env - copy .env.local.example to .env and configure."
 }
 
 Write-Host "==> Build images"
@@ -31,7 +31,7 @@ Invoke-Expression "$Compose up -d"
 Write-Host ""
 Write-Host "TRADEVERSE is running."
 Write-Host "  Localhost:  http://localhost/terminal"
-Write-Host "  LAN:        http://<YOUR_LAN_IP>/terminal  (find IP: ipconfig)"
+Write-Host "  LAN:        http://YOUR_LAN_IP/terminal  (find IP: ipconfig)"
 Write-Host "  Admin:      http://localhost/admin"
 Write-Host "  Health:     http://localhost/api/v1/health"
 Write-Host ""
