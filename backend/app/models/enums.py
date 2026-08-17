@@ -17,6 +17,7 @@ class VolatilityClass(str, Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
+    VERY_HIGH = "very_high"
 
 
 class LiquidityClass(str, Enum):
@@ -37,6 +38,33 @@ class MarketSessionStatus(str, Enum):
     OPEN = "open"
     PAUSED = "paused"
     CLOSED = "closed"
+
+
+class SimulationStatus(str, Enum):
+    NOT_STARTED = "not_started"
+    RUNNING = "running"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+
+
+class StockStatus(str, Enum):
+    ACTIVE = "active"
+    DISSOLVED = "dissolved"
+
+
+class TimelineEventType(str, Enum):
+    NEWS = "NEWS"
+    IPO_OPEN = "IPO_OPEN"
+    IPO_CLOSE = "IPO_CLOSE"
+    IPO_ALLOTMENT = "IPO_ALLOTMENT"
+    IPO_LISTING = "IPO_LISTING"
+    COMPANY_DISSOLUTION = "COMPANY_DISSOLUTION"
+    SIMULATION_END = "SIMULATION_END"
+
+
+class TimelineEventStatus(str, Enum):
+    PENDING = "pending"
+    EXECUTED = "executed"
 
 
 class Sector(str, Enum):

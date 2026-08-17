@@ -15,8 +15,16 @@ router = APIRouter(tags=["market"])
 def public_news(db: Session = Depends(get_db)) -> list[NewsRead]:
     out = []
     for event in news_service.list_news(db, released_only=True):
+        detail = news_service.news_detail_dict(event)
         read = NewsRead.model_validate(event)
-        out.append(read.model_copy(update={"effective_impact": effective_impact(event)}))
+        out.append(
+            read.model_copy(
+                update={
+                    "effective_impact": effective_impact(event),
+                    "sector_impacts": detail["sector_impacts"],
+                }
+            )
+        )
     return out
 
 

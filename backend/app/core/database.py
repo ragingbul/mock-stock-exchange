@@ -110,6 +110,27 @@ def _ensure_sqlite_columns(bind: Engine) -> None:
                 if name not in news_cols:
                     conn.execute(text(f"ALTER TABLE news_events ADD COLUMN {name} {decl}"))
 
+        stock_cols = _cols("stocks")
+        if stock_cols and "status" not in stock_cols:
+            conn.execute(text("ALTER TABLE stocks ADD COLUMN status VARCHAR(32) DEFAULT 'active'"))
+        if stock_cols and "liquidation_price" not in stock_cols:
+            conn.execute(text("ALTER TABLE stocks ADD COLUMN liquidation_price NUMERIC(18,4)"))
+
+        ipo_cols = _cols("ipos")
+        if ipo_cols and "timeline_key" not in ipo_cols:
+            conn.execute(text("ALTER TABLE ipos ADD COLUMN timeline_key VARCHAR(64)"))
+
+        settings_cols = _cols("simulation_settings")
+        settings_alters = [
+            ("sim_duration_sec", "FLOAT DEFAULT 10800"),
+            ("sim_speed_multiplier", "FLOAT DEFAULT 1"),
+            ("simulation_seed", "INTEGER DEFAULT 42"),
+        ]
+        if settings_cols:
+            for name, decl in settings_alters:
+                if name not in settings_cols:
+                    conn.execute(text(f"ALTER TABLE simulation_settings ADD COLUMN {name} {decl}"))
+
         conn.execute(
             text(
                 """

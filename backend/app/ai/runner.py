@@ -186,6 +186,7 @@ def run_agent_once(db: Session, agent: AIAgent, stock: Stock) -> dict:
         )
         return {
             "order_id": order.id,
+            "stock_id": stock.id,
             "status": order.status.value,
             "trades": len(trades),
             "strategy": agent.strategy,

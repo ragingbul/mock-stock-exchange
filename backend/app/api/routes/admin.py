@@ -25,6 +25,61 @@ from app.api.routes.stocks import _to_stock_read
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
+@router.post("/simulation/start")
+async def simulation_start(db: Session = Depends(get_db)) -> dict:
+    from app.services.simulation_controller import SimulationControlError, start_simulation
+
+    try:
+        result = start_simulation(db)
+    except SimulationControlError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await manager.broadcast("SIMULATION_STATUS", result)
+    return result
+
+
+@router.post("/simulation/stop")
+async def simulation_stop(db: Session = Depends(get_db)) -> dict:
+    from app.services.simulation_controller import SimulationControlError, stop_simulation
+
+    try:
+        result = stop_simulation(db)
+    except SimulationControlError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await manager.broadcast("SIMULATION_STATUS", result)
+    return result
+
+
+@router.post("/simulation/reset")
+async def simulation_reset(db: Session = Depends(get_db)) -> dict:
+    from app.services.simulation_controller import SimulationControlError, reset_simulation
+
+    try:
+        result = reset_simulation(db)
+    except SimulationControlError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    await manager.broadcast("SIMULATION_STATUS", result)
+    return result
+
+
+@router.get("/simulation/status")
+def simulation_status(db: Session = Depends(get_db)) -> dict:
+    from app.services.simulation_clock import status_dict
+    from app.services.timeline_service import progress_snapshot
+
+    state = status_dict(db)
+    progress = progress_snapshot(db, state["elapsed_sec"])
+    return {**state, **progress}
+
+
+@router.get("/timeline/progress")
+def timeline_progress(db: Session = Depends(get_db)) -> dict:
+    from app.services.simulation_clock import get_or_create_state
+    from app.services.timeline_service import progress_snapshot
+
+    state = get_or_create_state(db)
+    return progress_snapshot(db, float(state.sim_elapsed_sec))
+
+
 def _market_status(db: Session) -> dict:
     session = db.scalar(select(MarketSession).order_by(MarketSession.id.desc()).limit(1))
     stocks = stock_service.list_stocks(db)

@@ -60,6 +60,7 @@ class IPO(Base):
     )
     stock_id: Mapped[int | None] = mapped_column(ForeignKey("stocks.id"), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    timeline_key: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

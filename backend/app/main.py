@@ -25,11 +25,11 @@ from app.core.database import check_database_connection, init_db
 async def lifespan(_app: FastAPI):
     if check_database_connection():
         init_db()
-    from app.services import ai_scheduler
+    from app.services import simulation_engine
 
-    ai_scheduler.start_scheduler()
+    simulation_engine.start_engine()
     yield
-    ai_scheduler.stop_scheduler()
+    simulation_engine.stop_engine()
 
 
 def create_app() -> FastAPI:

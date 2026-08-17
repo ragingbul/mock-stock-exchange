@@ -41,6 +41,12 @@ def db_session() -> Session:
     Base.metadata.create_all(bind=engine)
     session = TestingSession()
     try:
+        from app.models.enums import SimulationStatus
+        from app.services.simulation_clock import get_or_create_state
+
+        state = get_or_create_state(session)
+        state.status = SimulationStatus.RUNNING
+        session.commit()
         yield session
     finally:
         session.close()
@@ -69,6 +75,14 @@ def client() -> TestClient:
 
     app.dependency_overrides[get_db] = _override_db
     with TestClient(app) as test_client:
+        db = TestingSession()
+        from app.models.enums import SimulationStatus
+        from app.services.simulation_clock import get_or_create_state
+
+        state = get_or_create_state(db)
+        state.status = SimulationStatus.RUNNING
+        db.commit()
+        db.close()
         yield test_client
     app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=engine)

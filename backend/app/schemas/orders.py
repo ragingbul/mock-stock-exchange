@@ -94,6 +94,7 @@ class NewsRead(BaseModel):
     market_wide_impact_pct: Decimal | None = None
     sector_impacts_json: str | None = None
     stock_impacts_json: str | None = None
+    sector_impacts: dict[str, float] | None = None
     status: str | None = None
     is_released: bool
     released_at: datetime | None = None

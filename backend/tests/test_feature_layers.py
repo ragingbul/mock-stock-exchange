@@ -175,7 +175,7 @@ def test_position_close_cancels_conditionals(db_session):
 def test_ipo_block_allot_partial(client):
     client.post("/api/v1/admin/bootstrap")
     sectors = client.get("/api/v1/sectors").json()
-    tech = next(s for s in sectors if s["slug"] == "technology")
+    tech = next(s for s in sectors if s["slug"] == "it")
     ipo = client.post(
         "/api/v1/admin/ipos",
         json={
@@ -234,14 +234,15 @@ def test_news_sector_impacts_and_target(db_session):
     detail = news_service.news_detail_dict(released)
     assert detail["sector_impacts"]["financials"] == -8
     impact = combined_target_for_stock(db_session, stock)
-    assert impact["target_impact_pct"] == -10.0  # stock override
+    # Sector-first: financials -8% with deterministic ±5% relative variation
+    assert -8.5 <= impact["target_impact_pct"] <= -7.5
 
 
 def test_simulation_settings_api(client):
     res = client.get("/api/v1/admin/simulation-settings")
     assert res.status_code == 200
     body = res.json()
-    assert body["ai_tick_min_sec"] == 15.0
+    assert body["ai_tick_min_sec"] == 30.0
     patched = client.patch(
         "/api/v1/admin/simulation-settings",
         json={"ai_tick_min_sec": 18, "ai_tick_max_sec": 28, "news_impact_tolerance_pct": 0.75},

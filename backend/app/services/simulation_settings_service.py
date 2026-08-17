@@ -42,4 +42,7 @@ def settings_dict(row: SimulationSettings) -> dict:
         "ipo_allocation_method": row.ipo_allocation_method,
         "max_ipo_lots_per_user": row.max_ipo_lots_per_user,
         "news_combined_impact_cap_pct": row.news_combined_impact_cap_pct,
+        "sim_duration_sec": row.sim_duration_sec,
+        "sim_speed_multiplier": row.sim_speed_multiplier,
+        "simulation_seed": row.simulation_seed,
     }

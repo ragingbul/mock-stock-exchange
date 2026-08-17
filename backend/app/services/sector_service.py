@@ -11,54 +11,54 @@ from app.models import Stock
 from app.models.enums import Sector
 from app.models.sector import MarketSector
 
-# Spec display sectors (slug, name, display_order)
-DEFAULT_SECTORS: list[tuple[str, str, int]] = [
+# TRADEVERSE 9-sector catalogue
+TRADEVERSE_SECTORS: list[tuple[str, str, int]] = [
     ("financials", "Financials", 1),
-    ("technology", "Technology", 2),
-    ("energy", "Energy", 3),
-    ("healthcare", "Healthcare", 4),
-    ("consumer", "Consumer", 5),
-    ("industrials", "Industrials", 6),
+    ("it", "IT", 2),
+    ("automobiles", "Automobiles", 3),
+    ("energy", "Energy", 4),
+    ("industrials", "Industrials", 5),
+    ("infrastructure", "Infrastructure", 6),
     ("real_estate", "Real Estate", 7),
-    ("utilities", "Utilities", 8),
-    ("telecommunications", "Telecommunications", 9),
-    ("automotive", "Automotive", 10),
+    ("metals", "Metals", 8),
+    ("consumer", "Consumer", 9),
 ]
+
+# Legacy sectors (kept for backward compatibility)
+DEFAULT_SECTORS: list[tuple[str, str, int]] = TRADEVERSE_SECTORS
 
 # Map legacy Stock.sector enum values → MarketSector.slug
 ENUM_TO_SECTOR_SLUG: dict[str, str] = {
-    "tech": "technology",
-    "data": "technology",
+    "tech": "it",
+    "data": "it",
+    "technology": "it",
     "finance": "financials",
     "financials": "financials",
     "energy": "energy",
-    "pharma": "healthcare",
-    "healthcare": "healthcare",
+    "pharma": "consumer",
+    "healthcare": "consumer",
     "retail": "consumer",
     "food": "consumer",
     "consumer": "consumer",
-    "infra": "industrials",
+    "infra": "infrastructure",
     "industrials": "industrials",
-    "auto": "automotive",
-    "automotive": "automotive",
+    "auto": "automobiles",
+    "automotive": "automobiles",
     "real_estate": "real_estate",
-    "utilities": "utilities",
-    "telecom": "telecommunications",
-    "technology": "technology",
+    "metals": "metals",
 }
 
 # Prefer a stable enum when assigning from a sector slug (for news matching)
 SLUG_TO_ENUM: dict[str, Sector] = {
-    "technology": Sector.TECH,
+    "it": Sector.TECH,
     "financials": Sector.FINANCE,
     "energy": Sector.ENERGY,
-    "healthcare": Sector.PHARMA,
     "consumer": Sector.RETAIL,
-    "industrials": Sector.INFRA,
-    "automotive": Sector.AUTO,
+    "industrials": Sector.INDUSTRIALS,
+    "infrastructure": Sector.INFRA,
+    "automobiles": Sector.AUTO,
     "real_estate": Sector.REAL_ESTATE,
-    "utilities": Sector.UTILITIES,
-    "telecommunications": Sector.TELECOM,
+    "metals": Sector.INDUSTRIALS,
 }
 
 
@@ -68,8 +68,13 @@ class SectorServiceError(Exception):
 
 def seed_default_sectors(db: Session) -> int:
     """Insert default sectors. Returns count of newly created rows."""
+    return seed_tradeverse_sectors(db)
+
+
+def seed_tradeverse_sectors(db: Session) -> int:
+    """Insert TRADEVERSE 9-sector catalogue."""
     created = 0
-    for slug, name, order in DEFAULT_SECTORS:
+    for slug, name, order in TRADEVERSE_SECTORS:
         existing = db.scalar(select(MarketSector).where(MarketSector.slug == slug))
         if existing:
             continue

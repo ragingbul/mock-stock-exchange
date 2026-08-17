@@ -55,6 +55,8 @@ class Stock(Base):
     tick_size: Mapped[Decimal] = mapped_column(Numeric(10, 4), nullable=False)
     is_open: Mapped[bool] = mapped_column(Boolean, default=True)
     is_halted: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String(32), default="active", index=True)
+    liquidation_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

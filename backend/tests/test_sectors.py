@@ -31,15 +31,15 @@ def _make_stock(db, ticker: str, sector: Sector, price: str = "100"):
 
 def test_seed_default_sectors(db_session):
     created = sector_service.seed_default_sectors(db_session)
-    assert created == 10
+    assert created == 9
     again = sector_service.seed_default_sectors(db_session)
     assert again == 0
     sectors = sector_service.list_sectors(db_session)
-    assert len(sectors) == 10
+    assert len(sectors) == 9
     names = {s.name for s in sectors}
     assert "Financials" in names
-    assert "Technology" in names
-    assert "Automotive" in names
+    assert "IT" in names
+    assert "Automobiles" in names
 
 
 def test_create_stock_links_sector_id(db_session):
@@ -47,7 +47,7 @@ def test_create_stock_links_sector_id(db_session):
     assert stock.sector_id is not None
     sector = sector_service.get_sector(db_session, stock.sector_id)
     assert sector is not None
-    assert sector.slug == "technology"
+    assert sector.slug == "it"
 
 
 def test_assign_stock_sector(db_session):
@@ -69,7 +69,7 @@ def test_sector_summary_gainers_losers(db_session):
     b.last_traded_price = Decimal("90")
     db_session.commit()
 
-    tech = sector_service.get_sector_by_slug(db_session, "technology")
+    tech = sector_service.get_sector_by_slug(db_session, "it")
     assert tech
     rows = sector_service.sector_summary(db_session, sector_id=tech.id)
     assert len(rows) == 1
@@ -86,10 +86,10 @@ def test_sectors_api(client):
     res = client.get("/api/v1/sectors")
     assert res.status_code == 200
     body = res.json()
-    assert len(body) >= 10
-    assert any(s["slug"] == "technology" for s in body)
+    assert len(body) >= 9
+    assert any(s["slug"] == "it" for s in body)
 
-    tech = next(s for s in body if s["slug"] == "technology")
+    tech = next(s for s in body if s["slug"] == "it")
     stocks = client.get(f"/api/v1/sectors/{tech['id']}/stocks")
     assert stocks.status_code == 200
     tickers = {s["ticker"] for s in stocks.json()}
@@ -108,7 +108,7 @@ def test_admin_assign_sector_api(client):
     stocks = client.get("/api/v1/stocks").json()
     stock = stocks[0]
     sectors = client.get("/api/v1/sectors").json()
-    target = next(s for s in sectors if s["slug"] == "utilities")
+    target = next(s for s in sectors if s["slug"] == "energy")
     res = client.patch(
         f"/api/v1/admin/stocks/{stock['id']}/sector",
         json={"sector_id": target["id"]},
@@ -116,14 +116,14 @@ def test_admin_assign_sector_api(client):
     assert res.status_code == 200
     updated = res.json()["stock"]
     assert updated["sector_id"] == target["id"]
-    assert updated["sector_slug"] == "utilities"
-    assert updated["sector_name"] == "Utilities"
+    assert updated["sector_slug"] == "energy"
+    assert updated["sector_name"] == "Energy"
 
 
 def test_list_stocks_filter_by_sector(client):
     client.post("/api/v1/admin/bootstrap")
     sectors = client.get("/api/v1/sectors").json()
-    auto = next(s for s in sectors if s["slug"] == "automotive")
+    auto = next(s for s in sectors if s["slug"] == "automobiles")
     filtered = client.get(f"/api/v1/stocks?sector_id={auto['id']}")
     assert filtered.status_code == 200
     for row in filtered.json():
