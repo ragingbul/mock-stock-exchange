@@ -1,25 +1,6 @@
 "use client";
 
-function num(v: string | number | null | undefined): number {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function signClass(v: string | number | null | undefined): string {
-  const n = num(v);
-  if (n > 0) return "text-[#22c55e]";
-  if (n < 0) return "text-[#ef4444]";
-  return "text-white";
-}
-
-function fmtMoney(v: string | number | null | undefined): string {
-  return `₹${num(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-}
-
-function fmtPct(v: string | null | undefined): string {
-  const n = num(v);
-  return `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
-}
+import { fmtMoney, fmtPct, signClass } from "@/lib/marketFormat";
 
 type Props = {
   cash?: string | null;

@@ -44,12 +44,21 @@ class SimulationControlError(Exception):
 
 
 def bootstrap_universe(db: Session) -> dict:
-    """Seed sectors, stocks, timeline, AI agents, liquidity if empty."""
-    from app.seed.tradeverse_stocks import seed_tradeverse_stocks
+    """Seed sectors, stocks, timeline, AI agents, liquidity if empty.
+
+    Use Admin RESET (not legacy /admin/bootstrap) for the full 40-stock TRADEVERSE universe.
+    """
+    from app.seed.tradeverse_stocks import TRADEVERSE_STOCKS, seed_tradeverse_stocks
 
     sectors_created = sector_service.seed_tradeverse_sectors(db)
     stocks_created = seed_tradeverse_stocks(db)
+    removed = _remove_non_canonical_stocks(db)
     linked = sector_service.backfill_stock_sectors(db)
+    canonical_count = _count_canonical_stocks(db)
+    if canonical_count != len(TRADEVERSE_STOCKS):
+        raise SimulationControlError(
+            f"TRADEVERSE universe incomplete: expected {len(TRADEVERSE_STOCKS)} stocks, found {canonical_count}"
+        )
     timeline_created = seed_timeline_from_json(db)
     agents = ai_runner.seed_default_agents(db)
     ai_runner.sync_intensity_configs(db)
@@ -58,11 +67,39 @@ def bootstrap_universe(db: Session) -> dict:
     return {
         "sectors_created": sectors_created,
         "stocks_created": stocks_created,
+        "stocks_removed": removed,
         "stocks_linked": linked,
+        "canonical_stocks": canonical_count,
         "timeline_events": timeline_created,
         "agents_created": agents,
         "liquidity_quotes": liquidity,
     }
+
+
+def _canonical_tickers() -> set[str]:
+    from app.seed.tradeverse_stocks import TRADEVERSE_STOCKS
+
+    return {ticker for ticker, *_ in TRADEVERSE_STOCKS}
+
+
+def _count_canonical_stocks(db: Session) -> int:
+    tickers = _canonical_tickers()
+    return int(
+        db.scalar(select(func.count(Stock.id)).where(Stock.ticker.in_(tickers))) or 0
+    )
+
+
+def _remove_non_canonical_stocks(db: Session) -> int:
+    """Remove legacy/default stocks not in the TRADEVERSE catalogue."""
+    tickers = _canonical_tickers()
+    orphans = list(
+        db.scalars(select(Stock).where(Stock.ticker.notin_(tickers))).all()
+    )
+    for stock in orphans:
+        db.delete(stock)
+    if orphans:
+        db.flush()
+    return len(orphans)
 
 
 def start_simulation(db: Session) -> dict:

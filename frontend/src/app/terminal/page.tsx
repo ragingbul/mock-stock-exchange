@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Leaderboard, type LeaderboardRow } from "@/components/Leaderboard";
 import { NewsPanel, type NewsItem } from "@/components/NewsPanel";
-import { StockSidebar, type SidebarStock } from "@/components/StockSidebar";
+import { StockSidebar, type SectorGroup, type SidebarStock } from "@/components/StockSidebar";
 import { TradePanel } from "@/components/TradePanel";
 import { WalletBar } from "@/components/WalletBar";
 import { useMarketWebSocket } from "@/hooks/useMarketWebSocket";
 import { apiGet, apiPost } from "@/lib/api";
+import { num } from "@/lib/marketFormat";
 
 type Wallet = {
   available_cash: string;
@@ -29,15 +30,11 @@ type IPO = {
   maximum_lots_per_user: number;
 };
 
-function num(v: string | number | null | undefined): number {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
 export default function TerminalPage() {
   const [traderId, setTraderId] = useState<number | null>(null);
   const [traderName, setTraderName] = useState("Trader");
   const [stocks, setStocks] = useState<SidebarStock[]>([]);
+  const [sectors, setSectors] = useState<SectorGroup[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
@@ -49,14 +46,12 @@ export default function TerminalPage() {
   const [ipos, setIpos] = useState<IPO[]>([]);
   const [ipoLots, setIpoLots] = useState(1);
   const [qty, setQty] = useState(10);
-  const [slPrice, setSlPrice] = useState("");
-  const [tpPrice, setTpPrice] = useState("");
   const [priceSeries, setPriceSeries] = useState<Array<{ t: string; px: number }>>([]);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [confirmSide, setConfirmSide] = useState<"buy" | "sell" | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [wsStatus, setWsStatus] = useState("—");
+  const [wsStatus, setWsStatus] = useState<"LIVE" | "OFF" | "Reconnecting">("OFF");
 
   const selected = useMemo(
     () => stocks.find((s) => s.id === selectedId) ?? null,
@@ -74,6 +69,12 @@ export default function TerminalPage() {
     if (!selectedId && s.length) setSelectedId(s[0].id);
     return s;
   }, [selectedId]);
+
+  const refreshSectors = useCallback(async () => {
+    const data = await apiGet<SectorGroup[]>("/market/sectors");
+    setSectors(data);
+    return data;
+  }, []);
 
   const refreshNews = useCallback(async () => {
     const n = await apiGet<NewsItem[]>("/news");
@@ -115,9 +116,14 @@ export default function TerminalPage() {
     }
   }, [stocks]);
 
+  const refreshMarket = useCallback(async () => {
+    await Promise.all([refreshStocks(), refreshSectors()]);
+  }, [refreshStocks, refreshSectors]);
+
   const refresh = useCallback(async () => {
     try {
       const s = await refreshStocks();
+      await refreshSectors();
       await refreshNews();
       const openIpos = await apiGet<IPO[]>("/ipos/open").catch(() => [] as IPO[]);
       setIpos(openIpos);
@@ -127,7 +133,7 @@ export default function TerminalPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load data");
     }
-  }, [refreshStocks, refreshNews, refreshWallet, refreshChart, traderId, selectedId]);
+  }, [refreshStocks, refreshSectors, refreshNews, refreshWallet, refreshChart, traderId, selectedId]);
 
   useEffect(() => {
     refresh();
@@ -148,14 +154,20 @@ export default function TerminalPage() {
     onOpen: () => setWsStatus("LIVE"),
     onClose: () => setWsStatus("OFF"),
     onMessage: (msg) => {
-      setWsStatus(msg.event ?? "EVENT");
       if (msg.event === "NEWS_RELEASED") {
-        const payload = (msg.payload ?? msg) as NewsItem;
-        setBreaking(payload);
+        const payload = msg.payload as NewsItem | undefined;
+        if (payload?.title) {
+          setBreaking({
+            id: payload.id ?? 0,
+            title: payload.title,
+            description: payload.description ?? "",
+            released_at: payload.released_at,
+          });
+        }
         refreshNews();
       }
       if (msg.event === "PRICE_UPDATED" || msg.event === "TRADE_EXECUTED") {
-        refreshStocks();
+        refreshMarket();
         if (selectedId) refreshChart(selectedId);
       }
       if (msg.event === "WALLET_UPDATED" || msg.event === "PORTFOLIO_UPDATED") {
@@ -166,10 +178,6 @@ export default function TerminalPage() {
       }
       if (msg.event === "IPO_OPENED" || msg.event === "IPO_RESULT" || msg.event === "IPO_LISTED") {
         apiGet<IPO[]>("/ipos/open").then(setIpos).catch(() => []);
-        refreshWallet();
-      }
-      if (msg.event === "STOP_LOSS_TRIGGERED" || msg.event === "TAKE_PROFIT_TRIGGERED") {
-        setToast(String((msg.payload as { message?: string })?.message ?? msg.event));
         refreshWallet();
       }
     },
@@ -196,24 +204,6 @@ export default function TerminalPage() {
       });
       if (res.execution_summary && !res.execution_summary.executed) {
         setError(res.execution_summary.message);
-      }
-      if (side === "buy" && slPrice) {
-        await apiPost("/conditionals", {
-          trader_id: traderId,
-          stock_id: selectedId,
-          condition_type: "stop_loss",
-          quantity: qty,
-          trigger_price: slPrice,
-        }).catch(() => {});
-      }
-      if (side === "buy" && tpPrice) {
-        await apiPost("/conditionals", {
-          trader_id: traderId,
-          stock_id: selectedId,
-          condition_type: "take_profit",
-          quantity: qty,
-          trigger_price: tpPrice,
-        }).catch(() => {});
       }
       setConfirmSide(null);
       await refresh();
@@ -264,12 +254,13 @@ export default function TerminalPage() {
         showLeaderboard={showLb}
       />
       <p className="border-x border-white/15 px-4 py-1 text-[10px] text-white/40">
-        {connected ? wsStatus : `${wsStatus} · fallback poll 12s`}
+        {wsStatus}
+        {!connected && wsStatus === "OFF" ? " · fallback poll 12s" : ""}
       </p>
 
-      <div className="grid flex-1 grid-cols-1 gap-0 lg:grid-cols-[220px_1fr_240px]">
+      <div className="grid flex-1 grid-cols-1 gap-0 lg:grid-cols-[240px_1fr_240px]">
         <StockSidebar
-          stocks={stocks}
+          sectors={sectors}
           selectedId={selectedId}
           onSelect={(id) => {
             setSelectedId(id);
@@ -282,10 +273,6 @@ export default function TerminalPage() {
           qty={qty}
           onQtyChange={setQty}
           holdingQty={holdingQty}
-          slPrice={slPrice}
-          tpPrice={tpPrice}
-          onSlChange={setSlPrice}
-          onTpChange={setTpPrice}
           onBuy={() => setConfirmSide("buy")}
           onSell={() => setConfirmSide("sell")}
           submitting={submitting}
@@ -327,11 +314,6 @@ export default function TerminalPage() {
             <p className="mt-2 text-lg">
               {confirmSide === "buy" ? "Buy" : "Sell"} {qty} {selected.ticker}
             </p>
-            {(slPrice || tpPrice) && confirmSide === "buy" && (
-              <p className="mt-2 text-xs text-white/50">
-                {slPrice ? `SL @ ₹${slPrice}` : ""} {tpPrice ? `TP @ ₹${tpPrice}` : ""}
-              </p>
-            )}
             <div className="mt-4 flex gap-2">
               <button type="button" className="flex-1 border border-white/25 py-2" onClick={() => setConfirmSide(null)}>
                 Cancel

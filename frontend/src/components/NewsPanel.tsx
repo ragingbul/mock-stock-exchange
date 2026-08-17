@@ -1,25 +1,14 @@
 "use client";
 
+import { signClass } from "@/lib/marketFormat";
+
 export type NewsItem = {
   id: number;
   title: string;
   description: string;
   effective_impact?: string;
   released_at?: string;
-  sector_impacts?: Record<string, number>;
 };
-
-function num(v: string | number | null | undefined): number {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function signClass(v: string | number | null | undefined): string {
-  const n = num(v);
-  if (n > 0) return "text-[#22c55e]";
-  if (n < 0) return "text-[#ef4444]";
-  return "text-white/60";
-}
 
 type Props = {
   news: NewsItem[];
@@ -56,15 +45,13 @@ export function NewsPanel({ news, breaking, onDismissBreaking, onSelectNews, sel
           <p className="text-white/40">Detail</p>
           <p className="mt-1 font-medium">{selectedNews.title}</p>
           <p className="mt-1 text-white/60">{selectedNews.description}</p>
-          {selectedNews.sector_impacts && (
-            <ul className="mt-2 space-y-0.5">
-              {Object.entries(selectedNews.sector_impacts).map(([k, v]) => (
-                <li key={k} className={v >= 0 ? "text-[#22c55e]" : "text-[#ef4444]"}>
-                  {k} {v > 0 ? "+" : ""}
-                  {v}%
-                </li>
-              ))}
-            </ul>
+          {selectedNews.released_at && (
+            <p className="mt-2 text-white/40">
+              {new Date(selectedNews.released_at).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </p>
           )}
         </div>
       )}
@@ -75,11 +62,11 @@ export function NewsPanel({ news, breaking, onDismissBreaking, onSelectNews, sel
             <li key={n.id}>
               <button
                 type="button"
-                className="w-full text-left hover:bg-white/5 p-1"
+                className="w-full p-1 text-left hover:bg-white/5"
                 onClick={() => onSelectNews(n)}
               >
                 <span className={signClass(n.effective_impact)}>
-                  {num(n.effective_impact) >= 0 ? "🟢" : "🔴"}{" "}
+                  ●{" "}
                   {n.released_at
                     ? new Date(n.released_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                     : "—"}
@@ -88,7 +75,7 @@ export function NewsPanel({ news, breaking, onDismissBreaking, onSelectNews, sel
               </button>
             </li>
           ))}
-          {!news.length && <li className="text-white/30 p-1">No news yet</li>}
+          {!news.length && <li className="p-1 text-white/30">No news yet</li>}
         </ul>
       </div>
     </aside>

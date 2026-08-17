@@ -7,8 +7,34 @@ from app.core.database import get_db
 from app.schemas.orders import NewsRead
 from app.services import leaderboard_service, news_service, sector_service
 from app.services.news_service import effective_impact
+from app.services.simulation_clock import status_dict
 
 router = APIRouter(tags=["market"])
+
+
+@router.get("/market/status")
+def market_status(db: Session = Depends(get_db)) -> dict:
+    """Public market dashboard data — no checkpoint spoilers."""
+    clock = status_dict(db)
+    change = sector_service.market_change_pct(db)
+    events = news_service.list_news(db, released_only=True)
+    latest = None
+    if events:
+        detail = news_service.news_detail_dict(events[0])
+        latest = {
+            "id": detail["id"],
+            "title": detail["title"],
+            "description": detail["description"],
+            "released_at": detail["released_at"],
+            "sector_impacts": detail["sector_impacts"],
+        }
+    return {
+        "elapsed": clock["elapsed"],
+        "current_phase": clock["current_phase"],
+        "status": clock["status"],
+        "market_change_pct": str(change),
+        "latest_news": latest,
+    }
 
 
 @router.get("/news", response_model=list[NewsRead])

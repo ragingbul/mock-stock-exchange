@@ -226,12 +226,31 @@ def sector_summary(db: Session, sector_id: int | None = None) -> list[dict]:
     return out
 
 
+def market_change_pct(db: Session) -> Decimal:
+    """Average percent change across all open stocks."""
+    stocks = list(db.scalars(select(Stock).where(Stock.is_open.is_(True))).all())
+    if not stocks:
+        return Decimal("0")
+    total = sum((_percent_change(s) for s in stocks), Decimal("0"))
+    return (total / len(stocks)).quantize(Decimal("0.0001"))
+
+
 def backfill_stock_sectors(db: Session) -> int:
     """Link existing stocks missing sector_id. Returns updated count."""
     ensure_sectors(db)
     updated = 0
-    stocks = list(db.scalars(select(Stock).where(Stock.sector_id.is_(None))).all())
+    metals = get_sector_by_slug(db, "metals")
+    metals_tickers = {"IRONCO", "COPPERX", "GOLDMIN", "ALUMCO"}
+    stocks = list(db.scalars(select(Stock)).all())
     for stock in stocks:
+        if metals is not None and stock.ticker in metals_tickers:
+            if stock.sector_id != metals.id:
+                stock.sector_id = metals.id
+                stock.sector = Sector.INDUSTRIALS
+                updated += 1
+            continue
+        if stock.sector_id is not None:
+            continue
         sector = resolve_sector_for_enum(db, stock.sector)
         if sector is None:
             continue

@@ -1,27 +1,11 @@
 "use client";
 
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { fmtPct, num, signClass } from "@/lib/marketFormat";
 import type { SidebarStock } from "./StockSidebar";
 
 const UP = "#22c55e";
 const DOWN = "#ef4444";
-
-function num(v: string | number | null | undefined): number {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function signClass(v: string | number | null | undefined): string {
-  const n = num(v);
-  if (n > 0) return "text-[#22c55e]";
-  if (n < 0) return "text-[#ef4444]";
-  return "text-white";
-}
-
-function fmtPct(v: string | null | undefined): string {
-  const n = num(v);
-  return `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
-}
 
 type Props = {
   stock: SidebarStock | null;
@@ -29,14 +13,17 @@ type Props = {
   qty: number;
   onQtyChange: (n: number) => void;
   holdingQty: number;
-  slPrice: string;
-  tpPrice: string;
-  onSlChange: (v: string) => void;
-  onTpChange: (v: string) => void;
   onBuy: () => void;
   onSell: () => void;
   submitting: boolean;
-  ipo?: { id: number; company_name: string; ticker: string; issue_price: string; lot_size: number; maximum_lots_per_user: number } | null;
+  ipo?: {
+    id: number;
+    company_name: string;
+    ticker: string;
+    issue_price: string;
+    lot_size: number;
+    maximum_lots_per_user: number;
+  } | null;
   ipoLots: number;
   onIpoLotsChange: (n: number) => void;
   onIpoApply?: () => void;
@@ -48,10 +35,6 @@ export function TradePanel({
   qty,
   onQtyChange,
   holdingQty,
-  slPrice,
-  tpPrice,
-  onSlChange,
-  onTpChange,
   onBuy,
   onSell,
   submitting,
@@ -90,31 +73,19 @@ export function TradePanel({
         </ResponsiveContainer>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-[10px] text-white/40">Quantity</label>
-          <input
-            type="number"
-            min={1}
-            className={`${inputCls} mt-1`}
-            value={qty}
-            onChange={(e) => onQtyChange(Number(e.target.value))}
-          />
-          <p className="mt-1 text-[10px] text-white/40">Holding: {holdingQty}</p>
-        </div>
-        <div className="space-y-2">
-          <div>
-            <label className="text-[10px] text-white/40">Stop loss (optional)</label>
-            <input className={`${inputCls} mt-1`} placeholder="₹" value={slPrice} onChange={(e) => onSlChange(e.target.value)} />
-          </div>
-          <div>
-            <label className="text-[10px] text-white/40">Take profit (optional)</label>
-            <input className={`${inputCls} mt-1`} placeholder="₹" value={tpPrice} onChange={(e) => onTpChange(e.target.value)} />
-          </div>
-        </div>
+      <div className="mt-4 max-w-xs">
+        <label className="text-[10px] text-white/40">Quantity</label>
+        <input
+          type="number"
+          min={1}
+          className={`${inputCls} mt-1`}
+          value={qty}
+          onChange={(e) => onQtyChange(Number(e.target.value))}
+        />
+        <p className="mt-1 text-[10px] text-white/40">Holding: {holdingQty}</p>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2">
+      <div className="mt-4 grid max-w-md grid-cols-2 gap-2">
         <button
           type="button"
           disabled={submitting || !stock}

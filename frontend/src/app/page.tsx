@@ -45,6 +45,12 @@ export default function Home() {
         >
           Admin panel
         </Link>
+        <Link
+          href="/market-screen"
+          className="border border-white/25 px-5 py-3 font-mono text-sm"
+        >
+          Market screen
+        </Link>
       </div>
       <p className="mt-8 font-mono text-xs text-white/40">
         API {health ? `${health.status}` : "offline"} ·{" "}

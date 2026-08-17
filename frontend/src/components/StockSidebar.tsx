@@ -1,5 +1,8 @@
 "use client";
 
+import { useMemo, useState } from "react";
+import { fmtMoney, fmtPct, signClass } from "@/lib/marketFormat";
+
 export type SidebarStock = {
   id: number;
   ticker: string;
@@ -9,35 +12,46 @@ export type SidebarStock = {
   sector_name?: string | null;
 };
 
-function num(v: string | number | null | undefined): number {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
+export type SectorStockRow = {
+  stock_id: number;
+  ticker: string;
+  company_name: string;
+  last_traded_price: string;
+  percent_change: string;
+};
 
-function signClass(v: string | number | null | undefined): string {
-  const n = num(v);
-  if (n > 0) return "text-[#22c55e]";
-  if (n < 0) return "text-[#ef4444]";
-  return "text-white/70";
-}
-
-function fmtPct(v: string | null | undefined): string {
-  const n = num(v);
-  return `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
-}
+export type SectorGroup = {
+  sector_id: number;
+  slug: string;
+  name: string;
+  stock_count: number;
+  sector_change_pct: string;
+  stocks: SectorStockRow[];
+};
 
 type Props = {
-  stocks: SidebarStock[];
+  sectors: SectorGroup[];
   selectedId: number | null;
   onSelect: (id: number) => void;
 };
 
-export function StockSidebar({ stocks, selectedId, onSelect }: Props) {
-  const groups = new Map<string, SidebarStock[]>();
-  for (const s of stocks) {
-    const key = s.sector_name || "Other";
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(s);
+export function StockSidebar({ sectors, selectedId, onSelect }: Props) {
+  const sectorKeys = useMemo(() => sectors.map((s) => s.slug), [sectors]);
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+
+  const expanded = useMemo(() => {
+    const next = new Set(sectorKeys);
+    for (const key of collapsed) next.delete(key);
+    return next;
+  }, [sectorKeys, collapsed]);
+
+  function toggleSector(slug: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(slug)) next.delete(slug);
+      else next.add(slug);
+      return next;
+    });
   }
 
   return (
@@ -46,34 +60,56 @@ export function StockSidebar({ stocks, selectedId, onSelect }: Props) {
         Stocks
       </p>
       <div className="flex-1 overflow-y-auto">
-        {[...groups.entries()].map(([sector, list]) => (
-          <div key={sector} className="border-b border-white/5">
-            <p className="sticky top-0 bg-black/95 px-3 py-1 text-[10px] uppercase text-white/35">
-              {sector}
-            </p>
-            <ul>
-              {list.map((s) => (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    onClick={() => onSelect(s.id)}
-                    className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-white/5 ${
-                      selectedId === s.id ? "bg-white/10" : ""
-                    }`}
-                  >
-                    <span className="font-medium">{s.ticker}</span>
-                    <span className="text-right">
-                      <span className="block tabular-nums">₹{num(s.last_traded_price).toFixed(2)}</span>
-                      <span className={`block text-[10px] ${signClass(s.percent_change)}`}>
-                        {fmtPct(s.percent_change)}
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+        {sectors.map((sector) => {
+          const isOpen = expanded.has(sector.slug);
+          const avg = sector.sector_change_pct;
+          return (
+            <div key={sector.slug} className="border-b border-white/5">
+              <button
+                type="button"
+                onClick={() => toggleSector(sector.slug)}
+                className="sticky top-0 z-10 flex w-full items-center justify-between bg-black/95 px-3 py-2 text-left hover:bg-white/5"
+              >
+                <span className="text-[10px] uppercase tracking-wide text-white/50">
+                  {isOpen ? "▼" : "▶"} {sector.name}
+                </span>
+                <span className={`text-[10px] tabular-nums ${signClass(avg)}`}>
+                  Avg {fmtPct(avg)}
+                </span>
+              </button>
+              {isOpen && (
+                <ul>
+                  {sector.stocks.map((s) => (
+                    <li key={s.stock_id}>
+                      <button
+                        type="button"
+                        onClick={() => onSelect(s.stock_id)}
+                        className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-white/5 ${
+                          selectedId === s.stock_id ? "bg-white/10" : ""
+                        }`}
+                      >
+                        <span>
+                          <span className="block font-medium">{s.ticker}</span>
+                          <span className="block text-[10px] text-white/40">{s.company_name}</span>
+                        </span>
+                        <span className="text-right">
+                          <span className="block tabular-nums">{fmtMoney(s.last_traded_price)}</span>
+                          <span className={`block text-[10px] ${signClass(s.percent_change)}`}>
+                            {fmtPct(s.percent_change)}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                  {!sector.stocks.length && (
+                    <li className="px-3 py-2 text-[10px] text-white/30">No active stocks</li>
+                  )}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+        {!sectors.length && <p className="p-3 text-xs text-white/30">Loading stocks…</p>}
       </div>
     </aside>
   );
