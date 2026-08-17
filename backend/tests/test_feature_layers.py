@@ -20,6 +20,7 @@ from app.services import (
 )
 from app.services.news_impact_resolver import combined_target_for_stock
 from app.services.simulation_settings_service import get_or_create_settings, update_settings
+from tests.conftest import join_participant
 
 
 def _stock(db, ticker="TCO", sector=Sector.TECH, price="100"):
@@ -42,14 +43,14 @@ def _stock(db, ticker="TCO", sector=Sector.TECH, price="100"):
 
 def test_wallet_fields(client):
     client.post("/api/v1/admin/bootstrap")
-    t = client.post("/api/v1/traders", json={"name": "WalletUser"}).json()
-    wallet = client.get(f"/api/v1/traders/{t['id']}/wallet").json()
+    trader_id, auth = join_participant(client, "WalletUser")
+    wallet = client.get(f"/api/v1/traders/{trader_id}/wallet", headers=auth).json()
     assert "available_cash" in wallet
     assert "cash_blocked_ipo" in wallet
     assert "invested" in wallet
     assert "portfolio_value" in wallet
     assert "return_pct" in wallet
-    pf = client.get(f"/api/v1/traders/{t['id']}/portfolio").json()
+    pf = client.get(f"/api/v1/traders/{trader_id}/portfolio", headers=auth).json()
     assert pf["available_cash"] == pf["cash"]
     assert "invested" in pf
 
@@ -191,20 +192,22 @@ def test_ipo_block_allot_partial(client):
         },
     ).json()
     client.post(f"/api/v1/admin/ipos/{ipo['id']}/open")
-    t1 = client.post("/api/v1/traders", json={"name": "IPO1"}).json()
-    t2 = client.post("/api/v1/traders", json={"name": "IPO2"}).json()
+    t1_id, t1_auth = join_participant(client, "IPO1")
+    t2_id, t2_auth = join_participant(client, "IPO2")
     a1 = client.post(
         f"/api/v1/ipos/{ipo['id']}/apply",
-        json={"trader_id": t1["id"], "requested_lots": 2},
+        json={"trader_id": t1_id, "requested_lots": 2},
+        headers=t1_auth,
     ).json()
     assert a1["status"] == "applied"
-    w1 = client.get(f"/api/v1/traders/{t1['id']}/wallet").json()
+    w1 = client.get(f"/api/v1/traders/{t1_id}/wallet", headers=t1_auth).json()
     assert float(w1["cash_blocked_ipo"]) == 100 * 50 * 2
     assert float(w1["available_cash"]) == 1_000_000 - 10_000
 
     client.post(
         f"/api/v1/ipos/{ipo['id']}/apply",
-        json={"trader_id": t2["id"], "requested_lots": 2},
+        json={"trader_id": t2_id, "requested_lots": 2},
+        headers=t2_auth,
     )
     client.post(f"/api/v1/admin/ipos/{ipo['id']}/close")
     allot = client.post(f"/api/v1/admin/ipos/{ipo['id']}/allot").json()
@@ -253,29 +256,30 @@ def test_simulation_settings_api(client):
 
 def test_conditionals_api(client):
     client.post("/api/v1/admin/bootstrap")
-    t = client.post("/api/v1/traders", json={"name": "CondUser"}).json()
+    trader_id, auth = join_participant(client, "CondUser")
     stocks = client.get("/api/v1/stocks").json()
     stock = stocks[0]
     # seed holdings
     client.put(
-        f"/api/v1/traders/{t['id']}/holdings",
+        f"/api/v1/traders/{trader_id}/holdings",
         json={"stock_id": stock["id"], "quantity": 50, "avg_cost": stock["last_traded_price"]},
     )
     ltp = float(stock["last_traded_price"])
     created = client.post(
         "/api/v1/conditionals",
         json={
-            "trader_id": t["id"],
+            "trader_id": trader_id,
             "stock_id": stock["id"],
             "condition_type": "stop_loss",
             "quantity": 20,
             "trigger_price": str(round(ltp * 0.9, 2)),
         },
+        headers=auth,
     )
     assert created.status_code == 200
-    rows = client.get(f"/api/v1/traders/{t['id']}/conditionals").json()
+    rows = client.get(f"/api/v1/traders/{trader_id}/conditionals", headers=auth).json()
     assert len(rows) >= 1
     cid = created.json()["id"]
-    cancelled = client.delete(f"/api/v1/conditionals/{cid}?trader_id={t['id']}")
+    cancelled = client.delete(f"/api/v1/conditionals/{cid}?trader_id={trader_id}", headers=auth)
     assert cancelled.status_code == 200
     assert cancelled.json()["status"] == "cancelled"

@@ -284,7 +284,7 @@ def ai_tick(db: Session = Depends(get_db)) -> dict:
 
 @router.post("/bootstrap")
 def bootstrap(db: Session = Depends(get_db)) -> dict:
-    from app.seed.stocks import seed_default_stocks
+    from app.services.simulation_controller import bootstrap_universe
 
     session = MarketSession(
         name="Bootstrapped Session",
@@ -294,19 +294,10 @@ def bootstrap(db: Session = Depends(get_db)) -> dict:
     db.add(session)
     db.flush()
 
-    sectors_created = sector_service.seed_default_sectors(db)
-    stocks = seed_default_stocks(db)
-    linked = sector_service.backfill_stock_sectors(db)
-    agents = ai_runner.seed_default_agents(db)
-    liquidity_quotes = seed_all_liquidity(db)
-    db.commit()
+    result = bootstrap_universe(db)
     db.refresh(session)
     return {
-        "sectors_created": sectors_created,
-        "stocks_created": stocks,
-        "stocks_sector_linked": linked,
-        "agents_created": agents,
-        "liquidity_quotes": liquidity_quotes,
+        **result,
         "session_id": session.id,
     }
 

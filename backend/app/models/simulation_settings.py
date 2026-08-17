@@ -17,6 +17,7 @@ class SimulationSettings(Base):
     ai_tick_min_sec: Mapped[float] = mapped_column(Float, default=30.0)
     ai_tick_max_sec: Mapped[float] = mapped_column(Float, default=30.0)
     ai_scheduler_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    simulation_ai_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     news_impact_tolerance_pct: Mapped[float] = mapped_column(Float, default=0.5)
     max_price_move_per_tick_pct: Mapped[float] = mapped_column(Float, default=3.0)
     max_daily_move_pct: Mapped[float] = mapped_column(Float, default=15.0)

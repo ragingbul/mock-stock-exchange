@@ -48,16 +48,17 @@ def bootstrap_universe(db: Session) -> dict:
 
     Use Admin RESET (not legacy /admin/bootstrap) for the full 40-stock TRADEVERSE universe.
     """
-    from app.seed.tradeverse_stocks import TRADEVERSE_STOCKS, seed_tradeverse_stocks
+    from app.seed.tradeverse_stocks import TRADEVERSE_STOCKS, canonical_tradable_count, seed_tradeverse_stocks
 
     sectors_created = sector_service.seed_tradeverse_sectors(db)
     stocks_created = seed_tradeverse_stocks(db)
     removed = _remove_non_canonical_stocks(db)
     linked = sector_service.backfill_stock_sectors(db)
+    expected = canonical_tradable_count()
     canonical_count = _count_canonical_stocks(db)
-    if canonical_count != len(TRADEVERSE_STOCKS):
+    if canonical_count != expected:
         raise SimulationControlError(
-            f"TRADEVERSE universe incomplete: expected {len(TRADEVERSE_STOCKS)} stocks, found {canonical_count}"
+            f"TRADEVERSE universe incomplete: expected {expected} tradable stocks, found {canonical_count}"
         )
     timeline_created = seed_timeline_from_json(db)
     agents = ai_runner.seed_default_agents(db)
@@ -65,6 +66,9 @@ def bootstrap_universe(db: Session) -> dict:
     liquidity = seed_all_liquidity(db)
     db.commit()
     return {
+        "message": "Canonical stock universe loaded successfully",
+        "tradable_stocks": canonical_count,
+        "expected_tradable": expected,
         "sectors_created": sectors_created,
         "stocks_created": stocks_created,
         "stocks_removed": removed,
@@ -124,7 +128,9 @@ def start_simulation(db: Session) -> dict:
 
     settings = get_or_create_settings(db)
     state.sim_duration_sec = float(settings.sim_duration_sec or 10800)
-    state.sim_speed_multiplier = float(settings.sim_speed_multiplier or 1.0)
+    from app.services.simulation_settings_service import sync_runtime_speed_from_settings
+
+    sync_runtime_speed_from_settings(db)
 
     if state.status == SimulationStatus.NOT_STARTED:
         state.sim_elapsed_sec = 0.0
@@ -147,6 +153,7 @@ def start_simulation(db: Session) -> dict:
 
     order_book_service.rebuild_books_from_db(db)
     db.commit()
+    logger.info("Simulation started")
     return {"ok": True, "action": "start", **status_dict(db)}
 
 
@@ -163,6 +170,7 @@ def stop_simulation(db: Session) -> dict:
         session.status = MarketSessionStatus.PAUSED
 
     db.commit()
+    logger.info("Simulation stopped at elapsed=%.0fs", float(state.sim_elapsed_sec))
     return {"ok": True, "action": "stop", **status_dict(db)}
 
 
@@ -211,13 +219,24 @@ def reset_simulation(db: Session) -> dict:
 
         sim_settings = get_or_create_settings(db)
         state.sim_duration_sec = float(sim_settings.sim_duration_sec or 10800)
-        state.sim_speed_multiplier = float(sim_settings.sim_speed_multiplier or 1.0)
+
+        from app.services.simulation_settings_service import sync_runtime_speed_from_settings
+
+        sync_runtime_speed_from_settings(db)
 
         seed_timeline_from_json(db, force=True)
-        bootstrap_universe(db)
+        bootstrap = bootstrap_universe(db)
 
         db.commit()
-        return {"ok": True, "action": "reset", **status_dict(db)}
+        logger.info("Simulation reset completed")
+        return {
+            "ok": True,
+            "action": "reset",
+            "message": bootstrap["message"],
+            "tradable_stocks": bootstrap["tradable_stocks"],
+            "expected_tradable": bootstrap["expected_tradable"],
+            **status_dict(db),
+        }
     except Exception:
         db.rollback()
         logger.exception("Reset failed")

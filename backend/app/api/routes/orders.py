@@ -4,10 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.security import require_trader
 from app.exchange.book_registry import books
+from app.models import Trader
+from app.models import Stock
 from app.realtime.ws_manager import manager
 from app.schemas.orders import OrderBookRead, OrderCreate, OrderRead, TradeRead
-from app.models import Stock
 from app.services import order_service
 from app.services.execution_summary import build_execution_summary, human_reason
 from app.services.order_service import OrderGatewayError
@@ -16,11 +18,17 @@ router = APIRouter(tags=["orders"])
 
 
 @router.post("/orders", response_model=dict, status_code=status.HTTP_201_CREATED)
-async def create_order(payload: OrderCreate, db: Session = Depends(get_db)) -> dict:
+async def create_order(
+    payload: OrderCreate,
+    db: Session = Depends(get_db),
+    trader: Trader = Depends(require_trader),
+) -> dict:
+    if payload.trader_id != trader.id:
+        raise HTTPException(status_code=403, detail="trader_id does not match authenticated session")
     try:
         order, trades = order_service.submit_order(
             db,
-            trader_id=payload.trader_id,
+            trader_id=trader.id,
             stock_id=payload.stock_id,
             side=payload.side,
             order_type=payload.order_type,
@@ -60,9 +68,9 @@ async def create_order(payload: OrderCreate, db: Session = Depends(get_db)) -> d
     )
     await manager.broadcast(
         "PORTFOLIO_UPDATED",
-        {"trader_id": payload.trader_id, "stock_id": order.stock_id},
+        {"trader_id": trader.id, "stock_id": order.stock_id},
     )
-    await manager.broadcast("WALLET_UPDATED", {"trader_id": payload.trader_id})
+    await manager.broadcast("WALLET_UPDATED", {"trader_id": trader.id})
 
     # Evaluate stop-loss / take-profit after price moves
     if trades:
@@ -85,10 +93,15 @@ async def create_order(payload: OrderCreate, db: Session = Depends(get_db)) -> d
 
 @router.delete("/orders/{order_id}", response_model=OrderRead)
 async def cancel_order(
-    order_id: int, trader_id: int | None = None, db: Session = Depends(get_db)
+    order_id: int,
+    trader_id: int | None = None,
+    db: Session = Depends(get_db),
+    trader: Trader = Depends(require_trader),
 ) -> OrderRead:
+    if trader_id is not None and trader_id != trader.id:
+        raise HTTPException(status_code=403, detail="trader_id does not match authenticated session")
     try:
-        order = order_service.cancel_order(db, order_id, trader_id=trader_id)
+        order = order_service.cancel_order(db, order_id, trader_id=trader.id)
     except OrderGatewayError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     await manager.broadcast(
@@ -104,11 +117,14 @@ def list_orders(
     stock_id: int | None = None,
     open_only: bool = False,
     db: Session = Depends(get_db),
+    trader: Trader = Depends(require_trader),
 ) -> list[OrderRead]:
+    if trader_id is not None and trader_id != trader.id:
+        raise HTTPException(status_code=403, detail="trader_id does not match authenticated session")
     return [
         OrderRead.model_validate(o)
         for o in order_service.list_orders(
-            db, trader_id=trader_id, stock_id=stock_id, open_only=open_only
+            db, trader_id=trader.id, stock_id=stock_id, open_only=open_only
         )
     ]
 

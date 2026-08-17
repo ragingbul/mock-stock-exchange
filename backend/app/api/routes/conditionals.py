@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.security import require_trader
+from app.models import Trader
 from app.models.conditional_order import ConditionalType
 from app.realtime.ws_manager import manager
 from app.schemas.orders import ConditionalCreate, ConditionalUpdate
@@ -32,7 +34,13 @@ def _row_dict(row) -> dict:
 
 
 @router.post("/conditionals")
-async def create_conditional(payload: ConditionalCreate, db: Session = Depends(get_db)) -> dict:
+async def create_conditional(
+    payload: ConditionalCreate,
+    db: Session = Depends(get_db),
+    trader: Trader = Depends(require_trader),
+) -> dict:
+    if payload.trader_id != trader.id:
+        raise HTTPException(403, "trader_id does not match authenticated session")
     try:
         ctype = ConditionalType(payload.condition_type)
     except ValueError as exc:
@@ -40,7 +48,7 @@ async def create_conditional(payload: ConditionalCreate, db: Session = Depends(g
     try:
         row = conditional_order_service.create_conditional(
             db,
-            trader_id=payload.trader_id,
+            trader_id=trader.id,
             stock_id=payload.stock_id,
             condition_type=ctype,
             quantity=payload.quantity,
@@ -58,9 +66,12 @@ def list_conditionals(
     trader_id: int,
     active_only: bool = False,
     db: Session = Depends(get_db),
+    trader: Trader = Depends(require_trader),
 ) -> list[dict]:
+    if trader_id != trader.id:
+        raise HTTPException(403, "trader_id does not match authenticated session")
     rows = conditional_order_service.list_conditionals(
-        db, trader_id=trader_id, active_only=active_only
+        db, trader_id=trader.id, active_only=active_only
     )
     return [_row_dict(r) for r in rows]
 
@@ -71,12 +82,15 @@ async def modify_conditional(
     payload: ConditionalUpdate,
     trader_id: int,
     db: Session = Depends(get_db),
+    trader: Trader = Depends(require_trader),
 ) -> dict:
+    if trader_id != trader.id:
+        raise HTTPException(403, "trader_id does not match authenticated session")
     try:
         row = conditional_order_service.modify_conditional(
             db,
             conditional_id,
-            trader_id=trader_id,
+            trader_id=trader.id,
             quantity=payload.quantity,
             trigger_price=payload.trigger_price,
         )
@@ -92,10 +106,13 @@ async def cancel_conditional(
     conditional_id: int,
     trader_id: int,
     db: Session = Depends(get_db),
+    trader: Trader = Depends(require_trader),
 ) -> dict:
+    if trader_id != trader.id:
+        raise HTTPException(403, "trader_id does not match authenticated session")
     try:
         row = conditional_order_service.cancel_conditional(
-            db, conditional_id, trader_id=trader_id
+            db, conditional_id, trader_id=trader.id
         )
     except ConditionalOrderError as exc:
         raise HTTPException(400, str(exc)) from exc

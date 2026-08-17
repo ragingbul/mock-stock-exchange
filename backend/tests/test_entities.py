@@ -5,6 +5,7 @@ from decimal import Decimal
 from app.schemas import HoldingAdjust, StockCreate, TraderCreate
 from app.seed.stocks import seed_default_stocks
 from app.services import portfolio_service, stock_service, trader_service
+from tests.conftest import join_participant
 from app.models.enums import (
     FundamentalProfile,
     LiquidityClass,
@@ -122,11 +123,8 @@ def test_seed_default_stocks(db_session) -> None:
 
 
 def test_api_create_traders_and_portfolio(client) -> None:
-    r1 = client.post("/api/v1/traders", json={"name": "Trader A"})
-    r2 = client.post("/api/v1/traders", json={"name": "Trader B"})
-    assert r1.status_code == 201
-    assert r2.status_code == 201
-    assert r1.json()["cash"] == "1000000.00"
+    trader_id, auth = join_participant(client, "Trader A")
+    join_participant(client, "Trader B")
 
     stock = client.post(
         "/api/v1/stocks",
@@ -141,7 +139,6 @@ def test_api_create_traders_and_portfolio(client) -> None:
     )
     assert stock.status_code == 201
     stock_id = stock.json()["id"]
-    trader_id = r1.json()["id"]
 
     holding = client.put(
         f"/api/v1/traders/{trader_id}/holdings",
@@ -150,7 +147,7 @@ def test_api_create_traders_and_portfolio(client) -> None:
     assert holding.status_code == 200
     assert holding.json()["quantity"] == 10
 
-    portfolio = client.get(f"/api/v1/traders/{trader_id}/portfolio")
+    portfolio = client.get(f"/api/v1/traders/{trader_id}/portfolio", headers=auth)
     assert portfolio.status_code == 200
     body = portfolio.json()
     assert body["holdings_value"] == "1000.0000" or Decimal(body["holdings_value"]) == Decimal(

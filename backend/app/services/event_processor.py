@@ -105,6 +105,17 @@ def _dispatch(db: Session, event: TimelineEvent, payload: dict, elapsed_sec: flo
     raise ValueError(f"unknown event type: {et}")
 
 
+def _news_direction(payload: dict) -> int:
+    market_wide = payload.get("market_wide")
+    sector_impacts = payload.get("sector_impacts") or {}
+    if market_wide is not None:
+        return 1 if float(market_wide) >= 0 else -1
+    if sector_impacts:
+        net = sum(float(v) for v in sector_impacts.values())
+        return 1 if net >= 0 else -1
+    return 1
+
+
 def _handle_news(db: Session, event: TimelineEvent, payload: dict) -> dict:
     sector_impacts = payload.get("sector_impacts") or {}
     market_wide = payload.get("market_wide")
@@ -115,7 +126,7 @@ def _handle_news(db: Session, event: TimelineEvent, payload: dict) -> dict:
         sector_impacts=sector_impacts,
         market_wide_impact_pct=market_wide,
         market_wide=market_wide is not None,
-        direction=1 if (market_wide or 0) >= 0 else -1,
+        direction=_news_direction(payload),
         impact=Decimal("1"),
         confidence=Decimal("1"),
         duration_minutes=9999,
@@ -130,15 +141,17 @@ def _handle_news(db: Session, event: TimelineEvent, payload: dict) -> dict:
 
 def _handle_ipo_open(db: Session, payload: dict) -> dict:
     from app.models.ipo import IPO, IPOStatus
+    from app.seed.tradeverse_stocks import resolve_ipo_sector_id
 
     key = payload.get("ipo_key") or payload["ticker"]
+    sector_id = payload.get("sector_id") or resolve_ipo_sector_id(db, payload["ticker"])
     existing = db.scalar(select(IPO).where(IPO.timeline_key == key))
     if existing is None:
         ipo = ipo_service.create_ipo(
             db,
             company_name=payload["company_name"],
             ticker=payload["ticker"],
-            sector_id=payload.get("sector_id"),
+            sector_id=sector_id,
             issue_price=payload["issue_price"],
             lot_size=payload["lot_size"],
             total_lots=payload["total_lots"],

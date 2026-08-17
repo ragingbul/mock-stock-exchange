@@ -8,7 +8,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.ai.base import MarketView, TraderStrategy
+from app.ai.base import MarketView, StrategyOrderIntent, TraderStrategy
 from app.ai.fomo import FomoStrategy
 from app.ai.market_maker import MarketMakerStrategy
 from app.ai.mean_reversion import MeanReversionStrategy
@@ -158,12 +158,27 @@ def run_agent_once(db: Session, agent: AIAgent, stock: Stock) -> dict:
         cfg["fire_rate"] = min(float(cfg.get("fire_rate", 0.5)), 0.25)
         cfg["aggressiveness"] = min(float(cfg.get("aggressiveness", 0.5)), 0.3)
     strategy = build_strategy(agent.strategy, cfg)
-    # Scale size by remaining impact for news-driven strategies
-    intent = strategy.decide(view, Decimal(trader.cash), _position(db, trader.id, stock.id))
+    position = _position(db, trader.id, stock.id)
+    cash = Decimal(trader.cash)
+    intent = strategy.decide(view, cash, position)
+    if intent is None and not reached and remaining < -0.5 and agent.strategy in {"market_maker", "noise"}:
+        sell_size = max(int(cfg.get("size", cfg.get("quote_size", 35))), 1)
+        sell_size = int(sell_size * (1.0 + min(abs(remaining) / 5.0, 2.0) * strength))
+        if agent.strategy == "market_maker":
+            from app.services.liquidity_service import _ensure_mm_inventory
+
+            _ensure_mm_inventory(db, trader.id, stock, sell_size)
+            intent = StrategyOrderIntent(
+                stock.id, "sell", "limit", sell_size, stock.last_traded_price
+            )
+        elif position >= sell_size:
+            intent = StrategyOrderIntent(
+                stock.id, "sell", "limit", sell_size, stock.last_traded_price
+            )
     if intent is None:
         return {"skipped": True, "reason": "no intent"}
     if not reached and abs(remaining) > 0 and agent.strategy in {"fomo", "panic", "momentum"}:
-        boost = 1.0 + min(abs(remaining) / 5.0, 2.0) * strength
+        boost = 1.0 + min(abs(remaining) / 4.0, 3.0) * strength
         intent.quantity = max(1, int(intent.quantity * boost * float(settings.ai_aggressiveness)))
     # Prefer selling into negative remaining targets / buying into positive
     if not reached:

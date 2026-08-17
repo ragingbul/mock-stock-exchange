@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { apiGet, apiPost } from "@/lib/api";
+import { NewsPanel, type NewsItem } from "@/components/NewsPanel";
+import { useMarketWebSocket } from "@/hooks/useMarketWebSocket";
+import { adminGet, adminLogin, adminPost } from "@/lib/api";
 
 type SimStatus = {
   status: string;
@@ -33,31 +35,72 @@ function fmtCountdown(sec: number | null | undefined) {
 
 export default function AdminPage() {
   const [status, setStatus] = useState<SimStatus | null>(null);
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const refresh = useCallback(async () => {
+  const [adminToken, setAdminToken] = useState<string | null>(null);
+  const [secret, setSecret] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setAdminToken(window.localStorage.getItem("mse_admin_token"));
+    }
+  }, []);
+
+  const refreshStatus = useCallback(async () => {
+    if (!adminToken) return;
     try {
-      const data = await apiGet<SimStatus>("/admin/simulation/status");
+      const data = await adminGet<SimStatus>("/admin/simulation/status");
       setStatus(data);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Failed to load status");
     }
-  }, []);
+  }, [adminToken]);
+
+  const refreshNews = useCallback(async () => {
+    if (!adminToken) return;
+    try {
+      const data = await adminGet<NewsItem[]>("/admin/news");
+      setNews(data);
+    } catch {
+      /* non-fatal */
+    }
+  }, [adminToken]);
 
   useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, 2000);
+    if (!adminToken) return;
+    refreshStatus();
+    refreshNews();
+    const id = setInterval(() => {
+      refreshStatus();
+      refreshNews();
+    }, 2000);
     return () => clearInterval(id);
-  }, [refresh]);
+  }, [refreshStatus, refreshNews, adminToken]);
+
+  useMarketWebSocket({
+    onMessage: (msg) => {
+      if (msg.event === "NEWS_RELEASED") {
+        refreshNews();
+      }
+    },
+  });
 
   async function act(action: "start" | "stop" | "reset") {
+    if (!adminToken) return;
     setBusy(true);
     setMsg("");
     try {
-      await apiPost(`/admin/simulation/${action}`);
+      await adminPost(`/admin/simulation/${action}`);
       setMsg(`${action.toUpperCase()} OK`);
-      await refresh();
+      await refreshStatus();
+      if (action === "reset") {
+        setNews([]);
+        setSelectedNews(null);
+        await refreshNews();
+      }
     } catch (e) {
       setMsg(e instanceof Error ? e.message : `${action} failed`);
     } finally {
@@ -67,6 +110,36 @@ export default function AdminPage() {
 
   const cp = status?.checkpoints ?? [];
   const currentId = status?.current_event?.checkpoint_id;
+
+  if (!adminToken) {
+    return (
+      <main className="min-h-screen bg-black text-white p-8 max-w-md mx-auto font-mono flex flex-col justify-center gap-4">
+        <h1 className="text-2xl font-bold tracking-widest text-center">TRADEVERSE ADMIN</h1>
+        <input
+          type="password"
+          placeholder="Admin secret"
+          value={secret}
+          onChange={(e) => setSecret(e.target.value)}
+          className="bg-neutral-900 border border-neutral-700 rounded px-3 py-2"
+        />
+        <button
+          className="px-4 py-2 bg-green-700 rounded"
+          onClick={async () => {
+            try {
+              const res = await adminLogin(secret);
+              setAdminToken(res.access_token);
+              setMsg("Authenticated");
+            } catch (e) {
+              setMsg(e instanceof Error ? e.message : "Login failed");
+            }
+          }}
+        >
+          Login
+        </button>
+        {msg && <p className="text-sm text-yellow-300 text-center">{msg}</p>}
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-black text-white p-8 max-w-2xl mx-auto font-mono">
@@ -122,7 +195,7 @@ export default function AdminPage() {
         </section>
       )}
 
-      <section className="border border-neutral-700 rounded p-4 max-h-96 overflow-y-auto">
+      <section className="border border-neutral-700 rounded p-4 max-h-96 overflow-y-auto mb-6">
         <h2 className="text-sm text-neutral-500 mb-3">CHECKPOINTS (read-only)</h2>
         <ul className="space-y-1 text-sm">
           {cp.map((c) => {
@@ -140,6 +213,8 @@ export default function AdminPage() {
           })}
         </ul>
       </section>
+
+      <NewsPanel news={news} selectedNews={selectedNews} onSelectNews={setSelectedNews} />
 
       <p className="text-center text-xs text-neutral-600 mt-8">
         Simulation runs on the server. Closing this tab does not stop the movie.

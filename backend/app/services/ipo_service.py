@@ -235,6 +235,17 @@ def list_ipo(db: Session, ipo_id: int) -> dict:
             from app.services.sector_service import SLUG_TO_ENUM
 
             sector_enum = SLUG_TO_ENUM.get(sector.slug, Sector.TECH)
+    else:
+        from app.seed.tradeverse_stocks import resolve_ipo_sector_id
+
+        resolved = resolve_ipo_sector_id(db, ipo.ticker)
+        if resolved:
+            ipo.sector_id = resolved
+            sector = sector_service.get_sector(db, resolved)
+            if sector:
+                from app.services.sector_service import SLUG_TO_ENUM
+
+                sector_enum = SLUG_TO_ENUM.get(sector.slug, Sector.TECH)
 
     stock = stock_service.create_stock(
         db,

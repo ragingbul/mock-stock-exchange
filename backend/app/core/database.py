@@ -23,12 +23,19 @@ def create_db_engine(url: str | None = None) -> Engine:
     settings = get_settings()
     database_url = url or settings.database_url
     connect_args = _sqlite_connect_args(database_url)
-    engine = create_engine(
-        database_url,
-        pool_pre_ping=not database_url.startswith("sqlite"),
-        future=True,
-        connect_args=connect_args,
-    )
+    engine_kwargs: dict = {
+        "pool_pre_ping": not database_url.startswith("sqlite"),
+        "future": True,
+        "connect_args": connect_args,
+    }
+    if not database_url.startswith("sqlite"):
+        engine_kwargs.update(
+            pool_size=settings.db_pool_size,
+            max_overflow=settings.db_max_overflow,
+            pool_recycle=settings.db_pool_recycle,
+            pool_timeout=settings.db_pool_timeout,
+        )
+    engine = create_engine(database_url, **engine_kwargs)
 
     if database_url.startswith("sqlite"):
 
@@ -125,6 +132,7 @@ def _ensure_sqlite_columns(bind: Engine) -> None:
             ("sim_duration_sec", "FLOAT DEFAULT 10800"),
             ("sim_speed_multiplier", "FLOAT DEFAULT 1"),
             ("simulation_seed", "INTEGER DEFAULT 42"),
+            ("simulation_ai_enabled", "BOOLEAN DEFAULT 1"),
         ]
         if settings_cols:
             for name, decl in settings_alters:

@@ -153,15 +153,15 @@
       "phase": "PHASE 1 \u2014 EUPHORIA",
       "description": "",
       "payload": {
-        "ipo_key": "ipo_1",
-        "company_name": "FutureTech Labs",
-        "ticker": "FUTURE",
-        "issue_price": 100,
-        "lot_size": 50,
-        "total_lots": 1000,
-        "winning_lots": 250,
+        "ipo_key": "ipo_fch",
+        "company_name": "Future Capital",
+        "ticker": "FCH",
+        "issue_price": 765,
+        "lot_size": 18,
+        "total_lots": 800,
+        "winning_lots": 200,
         "maximum_lots_per_user": 2,
-        "description": "Growth technology IPO"
+        "description": "Financial services IPO — issue price ₹765"
       }
     },
     {
@@ -183,13 +183,69 @@
     {
       "checkpoint_id": 12,
       "idempotency_key": "cp_12",
-      "time": "00:38",
+      "time": "00:36",
       "type": "IPO_ALLOTMENT",
-      "headline": "IPO #1 allotment",
+      "headline": "FCH IPO allotment",
       "phase": "PHASE 1 \u2014 EUPHORIA",
       "description": "",
       "payload": {
-        "ipo_key": "ipo_1"
+        "ipo_key": "ipo_fch"
+      }
+    },
+    {
+      "checkpoint_id": 13,
+      "idempotency_key": "cp_13_list",
+      "time": "00:37",
+      "type": "IPO_LISTING",
+      "headline": "FCH lists on exchange",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_fch"
+      }
+    },
+    {
+      "checkpoint_id": 13,
+      "idempotency_key": "cp_13b",
+      "time": "00:38",
+      "type": "IPO_OPEN",
+      "headline": "Reliance Power IPO application opens",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_rpower",
+        "company_name": "Reliance Power",
+        "ticker": "RPOWER",
+        "issue_price": 450,
+        "lot_size": 30,
+        "total_lots": 1000,
+        "winning_lots": 250,
+        "maximum_lots_per_user": 2,
+        "description": "Power / infrastructure IPO — issue price ₹450"
+      }
+    },
+    {
+      "checkpoint_id": 13,
+      "idempotency_key": "cp_13c",
+      "time": "00:40",
+      "type": "IPO_ALLOTMENT",
+      "headline": "Reliance Power IPO allotment",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_rpower"
+      }
+    },
+    {
+      "checkpoint_id": 13,
+      "idempotency_key": "cp_13d",
+      "time": "00:41",
+      "type": "IPO_LISTING",
+      "headline": "Reliance Power lists on exchange",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_rpower"
       }
     },
     {
@@ -335,14 +391,15 @@
       "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
       "description": "",
       "payload": {
-        "ipo_key": "ipo_2",
-        "company_name": "Speculative Ventures",
-        "ticker": "SPECU",
-        "issue_price": 80,
-        "lot_size": 40,
+        "ipo_key": "ipo_jkil",
+        "company_name": "J Kumar Infra",
+        "ticker": "JKIL",
+        "issue_price": 110,
+        "lot_size": 50,
         "total_lots": 800,
         "winning_lots": 200,
-        "maximum_lots_per_user": 2
+        "maximum_lots_per_user": 2,
+        "description": "Infrastructure IPO — issue price ₹110"
       }
     },
     {
@@ -365,17 +422,73 @@
       "idempotency_key": "cp_24",
       "time": "01:16",
       "type": "IPO_ALLOTMENT",
-      "headline": "IPO #2 allotment",
+      "headline": "JKIL IPO allotment",
       "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
       "description": "",
       "payload": {
-        "ipo_key": "ipo_2"
+        "ipo_key": "ipo_jkil"
+      }
+    },
+    {
+      "checkpoint_id": 24,
+      "idempotency_key": "cp_24_list",
+      "time": "01:17",
+      "type": "IPO_LISTING",
+      "headline": "JKIL lists on exchange",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_jkil"
+      }
+    },
+    {
+      "checkpoint_id": 24,
+      "idempotency_key": "cp_24b",
+      "time": "01:18",
+      "type": "IPO_OPEN",
+      "headline": "Cords Cable IPO application opens",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_cordscable",
+        "company_name": "Cords Cable",
+        "ticker": "CORDSCABLE",
+        "issue_price": 135,
+        "lot_size": 40,
+        "total_lots": 600,
+        "winning_lots": 150,
+        "maximum_lots_per_user": 2,
+        "description": "Manufacturing IPO — issue price ₹135"
+      }
+    },
+    {
+      "checkpoint_id": 24,
+      "idempotency_key": "cp_24c",
+      "time": "01:20",
+      "type": "IPO_ALLOTMENT",
+      "headline": "Cords Cable IPO allotment",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_cordscable"
+      }
+    },
+    {
+      "checkpoint_id": 24,
+      "idempotency_key": "cp_24d",
+      "time": "01:21",
+      "type": "IPO_LISTING",
+      "headline": "Cords Cable lists on exchange",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_cordscable"
       }
     },
     {
       "checkpoint_id": 25,
       "idempotency_key": "cp_25",
-      "time": "01:18",
+      "time": "01:22",
       "type": "NEWS",
       "headline": "Major bank warns credit losses may be significantly larger than expected",
       "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
@@ -548,11 +661,11 @@
       "idempotency_key": "cp_36",
       "time": "01:55",
       "type": "COMPANY_DISSOLUTION",
-      "headline": "LehmanX Capital dissolved",
+      "headline": "ICICI Bank dissolved (fictional in-game event)",
       "phase": "PHASE 3 \u2014 CRASH",
       "description": "Fictional in-game dissolution",
       "payload": {
-        "ticker": "LEHMANX",
+        "ticker": "ICICIBANK",
         "liquidation_price": 8
       }
     },
@@ -800,14 +913,15 @@
       "phase": "PHASE 4 \u2014 RECOVERY",
       "description": "",
       "payload": {
-        "ipo_key": "ipo_recovery",
-        "company_name": "RecoveryTech",
-        "ticker": "RECOV",
-        "issue_price": 50,
-        "lot_size": 30,
+        "ipo_key": "ipo_20microns",
+        "company_name": "20 Microns",
+        "ticker": "20MICRONS",
+        "issue_price": 55,
+        "lot_size": 100,
         "total_lots": 500,
         "winning_lots": 150,
-        "maximum_lots_per_user": 2
+        "maximum_lots_per_user": 2,
+        "description": "Industrial minerals IPO — issue price ₹55"
       }
     },
     {
@@ -819,7 +933,7 @@
       "phase": "PHASE 4 \u2014 RECOVERY",
       "description": "",
       "payload": {
-        "ipo_key": "ipo_recovery"
+        "ipo_key": "ipo_20microns"
       }
     },
     {
@@ -831,7 +945,7 @@
       "phase": "PHASE 4 \u2014 RECOVERY",
       "description": "",
       "payload": {
-        "ipo_key": "ipo_recovery"
+        "ipo_key": "ipo_20microns"
       }
     },
     {

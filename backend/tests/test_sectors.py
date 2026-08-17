@@ -93,7 +93,7 @@ def test_sectors_api(client):
     stocks = client.get(f"/api/v1/sectors/{tech['id']}/stocks")
     assert stocks.status_code == 200
     tickers = {s["ticker"] for s in stocks.json()}
-    assert "TECHNOVA" in tickers or "DATACORE" in tickers
+    assert "TCS" in tickers or "HCLTECH" in tickers
 
     summary = client.get("/api/v1/sectors/summary")
     assert summary.status_code == 200

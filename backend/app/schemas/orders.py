@@ -152,6 +152,7 @@ class SimulationSettingsUpdate(BaseModel):
     ai_tick_min_sec: float | None = None
     ai_tick_max_sec: float | None = None
     ai_scheduler_enabled: bool | None = None
+    simulation_ai_enabled: bool | None = None
     news_impact_tolerance_pct: float | None = None
     max_price_move_per_tick_pct: float | None = None
     max_daily_move_pct: float | None = None

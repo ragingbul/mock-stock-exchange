@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { BreakingNewsAlert } from "@/components/BreakingNewsAlert";
+import type { NewsItem } from "@/components/NewsPanel";
 import { Leaderboard, type LeaderboardRow } from "@/components/Leaderboard";
-import { NewsPanel, type NewsItem } from "@/components/NewsPanel";
 import { StockSidebar, type SectorGroup, type SidebarStock } from "@/components/StockSidebar";
 import { TradePanel } from "@/components/TradePanel";
 import { WalletBar } from "@/components/WalletBar";
 import { useMarketWebSocket } from "@/hooks/useMarketWebSocket";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiGet, apiPost, fetchSessionBootstrap, joinSession } from "@/lib/api";
 import { num } from "@/lib/marketFormat";
 
 type Wallet = {
@@ -38,9 +39,7 @@ export default function TerminalPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
-  const [news, setNews] = useState<NewsItem[]>([]);
   const [breaking, setBreaking] = useState<NewsItem | null>(null);
-  const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
   const [showLb, setShowLb] = useState(false);
   const [ipos, setIpos] = useState<IPO[]>([]);
@@ -63,6 +62,11 @@ export default function TerminalPage() {
     return portfolio.holdings.find((h) => h.ticker === selected.ticker)?.quantity ?? 0;
   }, [selected, portfolio]);
 
+  const dissolvedStocks = useMemo(
+    () => stocks.filter((s) => s.is_open === false),
+    [stocks],
+  );
+
   const refreshStocks = useCallback(async () => {
     const s = await apiGet<SidebarStock[]>("/stocks");
     setStocks(s);
@@ -76,10 +80,43 @@ export default function TerminalPage() {
     return data;
   }, []);
 
-  const refreshNews = useCallback(async () => {
-    const n = await apiGet<NewsItem[]>("/news");
-    setNews(n);
-  }, []);
+  const applyBootstrap = useCallback((data: Awaited<ReturnType<typeof fetchSessionBootstrap>>) => {
+    setTraderId(data.trader_id);
+    setWallet({
+      available_cash: data.wallet.available_cash,
+      portfolio_value: data.wallet.portfolio_value,
+      total_pnl: data.wallet.total_pnl ?? "0",
+      return_pct: data.wallet.return_pct ?? "0",
+    });
+    setPortfolio(data.portfolio);
+    if (data.stocks?.length) {
+      setStocks(
+        data.stocks.map((s) => ({
+          id: s.id,
+          ticker: s.ticker,
+          company_name: s.company_name ?? s.ticker,
+          last_traded_price: s.ltp ?? s.last_traded_price ?? "0",
+          percent_change: s.percent_change ?? null,
+          is_open: s.is_open ?? true,
+        })),
+      );
+      if (!selectedId) setSelectedId(data.stocks.find((s) => s.is_open !== false)?.id ?? data.stocks[0].id);
+    }
+    if (data.sectors?.length) setSectors(data.sectors);
+    if (data.leaderboard?.length) setLeaderboard(data.leaderboard);
+    if (data.open_ipos?.length) setIpos(data.open_ipos);
+  }, [selectedId]);
+
+  const resyncBootstrap = useCallback(async () => {
+    const token = localStorage.getItem("mse_access_token");
+    if (!token) return;
+    try {
+      const data = await fetchSessionBootstrap();
+      applyBootstrap(data);
+    } catch {
+      /* token may be stale; user can re-join */
+    }
+  }, [applyBootstrap]);
 
   const refreshWallet = useCallback(async () => {
     if (!traderId) return;
@@ -124,7 +161,6 @@ export default function TerminalPage() {
     try {
       const s = await refreshStocks();
       await refreshSectors();
-      await refreshNews();
       const openIpos = await apiGet<IPO[]>("/ipos/open").catch(() => [] as IPO[]);
       setIpos(openIpos);
       if (traderId) await refreshWallet();
@@ -133,7 +169,7 @@ export default function TerminalPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load data");
     }
-  }, [refreshStocks, refreshSectors, refreshNews, refreshWallet, refreshChart, traderId, selectedId]);
+  }, [refreshStocks, refreshSectors, refreshWallet, refreshChart, traderId, selectedId]);
 
   useEffect(() => {
     refresh();
@@ -147,12 +183,20 @@ export default function TerminalPage() {
 
   useEffect(() => {
     const saved = localStorage.getItem("mse_trader_id");
-    if (saved) setTraderId(Number(saved));
-  }, []);
+    const token = localStorage.getItem("mse_access_token");
+    if (saved && token) {
+      setTraderId(Number(saved));
+      resyncBootstrap();
+    }
+  }, [resyncBootstrap]);
 
-  const { connected } = useMarketWebSocket({
+  const { connected, reconnecting } = useMarketWebSocket({
     onOpen: () => setWsStatus("LIVE"),
-    onClose: () => setWsStatus("OFF"),
+    onClose: () => setWsStatus("Reconnecting"),
+    onReconnect: () => {
+      setWsStatus("LIVE");
+      resyncBootstrap();
+    },
     onMessage: (msg) => {
       if (msg.event === "NEWS_RELEASED") {
         const payload = msg.payload as NewsItem | undefined;
@@ -164,7 +208,6 @@ export default function TerminalPage() {
             released_at: payload.released_at,
           });
         }
-        refreshNews();
       }
       if (msg.event === "PRICE_UPDATED" || msg.event === "TRADE_EXECUTED") {
         refreshMarket();
@@ -183,10 +226,19 @@ export default function TerminalPage() {
     },
   });
 
+  useEffect(() => {
+    if (reconnecting) setWsStatus("Reconnecting");
+  }, [reconnecting]);
+
   async function join() {
-    const created = await apiPost<{ id: number }>("/traders", { name: traderName || "Trader" });
-    setTraderId(created.id);
-    localStorage.setItem("mse_trader_id", String(created.id));
+    try {
+      const created = await joinSession(traderName || "Trader");
+      setTraderId(created.trader_id);
+      await resyncBootstrap();
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not join session");
+    }
   }
 
   async function executeOrder(side: "buy" | "sell") {
@@ -258,9 +310,12 @@ export default function TerminalPage() {
         {!connected && wsStatus === "OFF" ? " · fallback poll 12s" : ""}
       </p>
 
-      <div className="grid flex-1 grid-cols-1 gap-0 lg:grid-cols-[240px_1fr_240px]">
+      <BreakingNewsAlert news={breaking} onDismiss={() => setBreaking(null)} />
+
+      <div className="grid flex-1 grid-cols-1 gap-0 lg:grid-cols-[240px_1fr]">
         <StockSidebar
           sectors={sectors}
+          dissolved={dissolvedStocks}
           selectedId={selectedId}
           onSelect={(id) => {
             setSelectedId(id);
@@ -280,13 +335,6 @@ export default function TerminalPage() {
           ipoLots={ipoLots}
           onIpoLotsChange={setIpoLots}
           onIpoApply={ipos[0] ? applyIpo : undefined}
-        />
-        <NewsPanel
-          news={news}
-          breaking={breaking}
-          onDismissBreaking={() => setBreaking(null)}
-          onSelectNews={setSelectedNews}
-          selectedNews={selectedNews}
         />
       </div>
 

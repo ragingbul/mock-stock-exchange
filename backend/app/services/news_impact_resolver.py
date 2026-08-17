@@ -45,6 +45,10 @@ SECTOR_ALIASES: dict[str, str] = {
     "healthcare": "consumer",
     "broad market": "broad_market",
     "broad_market": "broad_market",
+    "power / infrastructure": "infrastructure",
+    "financial services": "financials",
+    "manufacturing": "industrials",
+    "industrial minerals": "metals",
 }
 
 

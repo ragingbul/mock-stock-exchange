@@ -26,14 +26,18 @@ VALID_TYPES = {t.value for t in TimelineEventType}
 
 
 def parse_time_to_sec(value: str) -> float:
-    """Parse HH:MM:SS or MM:SS into simulation seconds."""
+    """Parse simulation clock time into seconds.
+
+    Two-part values are HH:MM (hours and minutes).
+    Three-part values are HH:MM:SS.
+    """
     parts = [float(p) for p in value.strip().split(":")]
     if len(parts) == 3:
         h, m, s = parts
         return h * 3600 + m * 60 + s
     if len(parts) == 2:
-        m, s = parts
-        return m * 60 + s
+        h, m = parts
+        return h * 3600 + m * 60
     raise ValueError(f"invalid time format: {value}")
 
 

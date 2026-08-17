@@ -70,3 +70,39 @@ def test_stop_freezes_timeline_progress(db_session):
         )
     ) or 0
     assert executed_after == executed_at_stop
+
+
+def test_news_creates_sector_impacts_and_moves_market(db_session):
+    """Release one NEWS event — sector impacts created and prices react."""
+    from decimal import Decimal
+
+    from app.ai import runner as ai_runner
+    from app.models import NewsStockImpact, Trade
+    from app.models.enums import Sector, VolatilityClass, LiquidityClass, FundamentalProfile
+    from app.schemas import StockCreate
+    from app.services import stock_service
+    from app.services.event_processor import process_due_events
+    from app.services.simulation_controller import reset_simulation, start_simulation
+    from app.services.timeline_service import seed_timeline_from_json
+
+    seed_timeline_from_json(db_session, force=True)
+    reset_simulation(db_session)
+    start_simulation(db_session)
+
+    financial = stock_service.get_stock_by_ticker(db_session, "AXISBANK")
+    assert financial is not None
+    ltp_before = Decimal(financial.last_traded_price)
+
+    process_due_events(db_session, 180.0)
+    db_session.commit()
+
+    impacts = db_session.scalar(select(func.count(NewsStockImpact.id))) or 0
+    assert impacts > 0
+
+    ai_runner.run_all_agents(db_session)
+    db_session.commit()
+    db_session.refresh(financial)
+
+    trade_count = db_session.scalar(select(func.count(Trade.id))) or 0
+    ltp_after = Decimal(financial.last_traded_price)
+    assert trade_count > 0 or ltp_after != ltp_before

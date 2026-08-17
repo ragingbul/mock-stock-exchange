@@ -240,7 +240,7 @@ def backfill_stock_sectors(db: Session) -> int:
     ensure_sectors(db)
     updated = 0
     metals = get_sector_by_slug(db, "metals")
-    metals_tickers = {"IRONCO", "COPPERX", "GOLDMIN", "ALUMCO"}
+    metals_tickers = {"HINDALCO", "SAIL", "TATASTEEL", "STER", "NATIONALUM"}
     stocks = list(db.scalars(select(Stock)).all())
     for stock in stocks:
         if metals is not None and stock.ticker in metals_tickers:

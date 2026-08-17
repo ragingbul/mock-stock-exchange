@@ -10,6 +10,7 @@ export type SidebarStock = {
   last_traded_price: string;
   percent_change: string | null;
   sector_name?: string | null;
+  is_open?: boolean;
 };
 
 export type SectorStockRow = {
@@ -31,11 +32,12 @@ export type SectorGroup = {
 
 type Props = {
   sectors: SectorGroup[];
+  dissolved?: SidebarStock[];
   selectedId: number | null;
   onSelect: (id: number) => void;
 };
 
-export function StockSidebar({ sectors, selectedId, onSelect }: Props) {
+export function StockSidebar({ sectors, dissolved = [], selectedId, onSelect }: Props) {
   const sectorKeys = useMemo(() => sectors.map((s) => s.slug), [sectors]);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
 
@@ -110,6 +112,18 @@ export function StockSidebar({ sectors, selectedId, onSelect }: Props) {
           );
         })}
         {!sectors.length && <p className="p-3 text-xs text-white/30">Loading stocks…</p>}
+        {dissolved.length > 0 && (
+          <div className="border-t border-white/10 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-white/40">Dissolved</p>
+            <ul>
+              {dissolved.map((s) => (
+                <li key={s.id} className="px-1 py-1 text-[10px] text-white/30">
+                  {s.ticker} · not tradable
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </aside>
   );

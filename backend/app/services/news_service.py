@@ -197,13 +197,28 @@ def news_detail_dict(event: NewsEvent) -> dict:
 def news_pressure_for_ticker(db: Session, ticker: str, *, now: datetime | None = None) -> Decimal:
     """Normalized news pressure for a ticker (amplified for event volatility)."""
     settings = get_settings()
+    stock = db.scalar(
+        select(Stock)
+        .options(joinedload(Stock.market_sector))
+        .where(Stock.ticker == ticker.upper())
+    )
     events = list_news(db, released_only=True)
     total = Decimal("0")
+    from app.services.news_impact_resolver import sector_impact_for_stock
+
     for event in events:
         tickers = [t.strip().upper() for t in event.affected_tickers.split(",") if t.strip()]
         if event.market_wide or ticker.upper() in tickers:
             total += effective_impact(event, now=now)
             continue
+        if stock is not None:
+            sector_pct = sector_impact_for_stock(event, stock)
+            if sector_pct is not None:
+                base = effective_impact(event, now=now)
+                magnitude = Decimal(str(1 + min(abs(sector_pct) / 10.0, 3.0)))
+                sign = Decimal("1") if sector_pct >= 0 else Decimal("-1")
+                total += base * magnitude * sign
+                continue
         # sector / JSON impacts also count
         try:
             stocks_map = json.loads(event.stock_impacts_json or "{}")

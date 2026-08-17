@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.security import require_trader
+from app.models import Trader
 from app.realtime.ws_manager import manager
 from app.schemas.orders import IPOApply, IPOCreate
 from app.services import ipo_service
@@ -57,22 +59,35 @@ def list_open_ipos(db: Session = Depends(get_db)) -> list[dict]:
 
 
 @router.post("/ipos/{ipo_id}/apply")
-async def apply_ipo(ipo_id: int, payload: IPOApply, db: Session = Depends(get_db)) -> dict:
+async def apply_ipo(
+    ipo_id: int,
+    payload: IPOApply,
+    db: Session = Depends(get_db),
+    trader: Trader = Depends(require_trader),
+) -> dict:
+    if payload.trader_id != trader.id:
+        raise HTTPException(403, "trader_id does not match authenticated session")
     try:
         app = ipo_service.apply_ipo(
-            db, ipo_id=ipo_id, trader_id=payload.trader_id, requested_lots=payload.requested_lots
+            db, ipo_id=ipo_id, trader_id=trader.id, requested_lots=payload.requested_lots
         )
     except IPOServiceError as exc:
         raise HTTPException(400, str(exc)) from exc
     data = _app_dict(app)
     await manager.broadcast("IPO_APPLICATION_UPDATED", data)
-    await manager.broadcast("WALLET_UPDATED", {"trader_id": payload.trader_id})
+    await manager.broadcast("WALLET_UPDATED", {"trader_id": trader.id})
     return data
 
 
 @router.get("/traders/{trader_id}/ipo-applications")
-def trader_ipo_apps(trader_id: int, db: Session = Depends(get_db)) -> list[dict]:
-    return [_app_dict(a) for a in ipo_service.list_applications(db, trader_id=trader_id)]
+def trader_ipo_apps(
+    trader_id: int,
+    db: Session = Depends(get_db),
+    trader: Trader = Depends(require_trader),
+) -> list[dict]:
+    if trader_id != trader.id:
+        raise HTTPException(403, "trader_id does not match authenticated session")
+    return [_app_dict(a) for a in ipo_service.list_applications(db, trader_id=trader.id)]
 
 
 @router.post("/admin/ipos")

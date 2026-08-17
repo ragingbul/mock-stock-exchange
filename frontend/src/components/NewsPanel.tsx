@@ -12,41 +12,23 @@ export type NewsItem = {
 
 type Props = {
   news: NewsItem[];
-  breaking: NewsItem | null;
-  onDismissBreaking: () => void;
-  onSelectNews: (item: NewsItem) => void;
   selectedNews: NewsItem | null;
+  onSelectNews: (item: NewsItem) => void;
 };
 
-export function NewsPanel({ news, breaking, onDismissBreaking, onSelectNews, selectedNews }: Props) {
+/** Full released-news list for admin monitoring. */
+export function NewsPanel({ news, selectedNews, onSelectNews }: Props) {
   return (
-    <aside className="flex h-full flex-col border border-white/15 bg-black">
-      <p className="border-b border-white/10 px-3 py-2 text-[10px] uppercase tracking-wider text-white/40">
-        News
-      </p>
-
-      {breaking && (
-        <div className="border-b border-[#ef4444]/40 bg-[#ef4444]/10 p-3">
-          <p className="text-[10px] font-bold text-[#ef4444]">BREAKING NEWS</p>
-          <p className="mt-1 text-sm">{breaking.title}</p>
-          <p className="mt-1 text-xs text-white/60">{breaking.description}</p>
-          <button
-            type="button"
-            className="mt-2 text-[10px] text-white/50 underline"
-            onClick={onDismissBreaking}
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
+    <section className="flex max-h-96 flex-col border border-neutral-700 rounded overflow-hidden">
+      <p className="border-b border-neutral-700 px-3 py-2 text-sm text-neutral-500">RELEASED NEWS</p>
 
       {selectedNews && (
-        <div className="border-b border-white/10 p-3 text-xs">
-          <p className="text-white/40">Detail</p>
+        <div className="border-b border-neutral-700 p-3 text-xs">
+          <p className="text-neutral-500">Detail</p>
           <p className="mt-1 font-medium">{selectedNews.title}</p>
-          <p className="mt-1 text-white/60">{selectedNews.description}</p>
+          <p className="mt-1 text-neutral-400">{selectedNews.description}</p>
           {selectedNews.released_at && (
-            <p className="mt-2 text-white/40">
+            <p className="mt-2 text-neutral-500">
               {new Date(selectedNews.released_at).toLocaleTimeString([], {
                 hour: "2-digit",
                 minute: "2-digit",
@@ -57,12 +39,12 @@ export function NewsPanel({ news, breaking, onDismissBreaking, onSelectNews, sel
       )}
 
       <div className="flex-1 overflow-y-auto p-2">
-        <ul className="space-y-2 text-xs">
+        <ul className="space-y-2 text-sm">
           {news.map((n) => (
             <li key={n.id}>
               <button
                 type="button"
-                className="w-full p-1 text-left hover:bg-white/5"
+                className="w-full rounded p-1 text-left hover:bg-neutral-900"
                 onClick={() => onSelectNews(n)}
               >
                 <span className={signClass(n.effective_impact)}>
@@ -75,9 +57,9 @@ export function NewsPanel({ news, breaking, onDismissBreaking, onSelectNews, sel
               </button>
             </li>
           ))}
-          {!news.length && <li className="p-1 text-white/30">No news yet</li>}
+          {!news.length && <li className="p-1 text-neutral-600">No news released yet</li>}
         </ul>
       </div>
-    </aside>
+    </section>
   );
 }

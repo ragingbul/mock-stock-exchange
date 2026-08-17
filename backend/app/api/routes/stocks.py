@@ -1,17 +1,31 @@
 """Stock HTTP routes."""
 
 from decimal import Decimal
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.database import get_db
+from app.core.security import require_admin
 from app.schemas import StockCreate, StockRead
 from app.seed.stocks import seed_default_stocks
 from app.services import sector_service, stock_service
 from app.services.stock_service import StockServiceError
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
+_bearer = HTTPBearer(auto_error=False)
+
+
+def _require_stock_mutation_admin(
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> dict | None:
+    if not get_settings().is_production:
+        return None
+    return require_admin(request, credentials)
 
 
 def _to_stock_read(stock) -> StockRead:  # type: ignore[no-untyped-def]
@@ -35,12 +49,15 @@ def _to_stock_read(stock) -> StockRead:  # type: ignore[no-untyped-def]
 
 
 @router.post("", response_model=StockRead, status_code=status.HTTP_201_CREATED)
-def create_stock(payload: StockCreate, db: Session = Depends(get_db)) -> StockRead:
+def create_stock(
+    payload: StockCreate,
+    db: Session = Depends(get_db),
+    _auth: dict | None = Depends(_require_stock_mutation_admin),
+) -> StockRead:
     try:
         stock = stock_service.create_stock(db, payload)
     except StockServiceError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    # reload with sector relationship
     stock = stock_service.get_stock(db, stock.id) or stock
     return _to_stock_read(stock)
 
@@ -62,7 +79,10 @@ def get_stock(stock_id: int, db: Session = Depends(get_db)) -> StockRead:
 
 
 @router.post("/seed/defaults", status_code=status.HTTP_201_CREATED)
-def seed_stocks(db: Session = Depends(get_db)) -> dict:
+def seed_stocks(
+    db: Session = Depends(get_db),
+    _auth: dict | None = Depends(_require_stock_mutation_admin),
+) -> dict:
     sector_service.ensure_sectors(db)
     created = seed_default_stocks(db)
     backfilled = sector_service.backfill_stock_sectors(db)

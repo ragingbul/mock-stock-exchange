@@ -28,6 +28,12 @@ def test_timeline_duration_end():
     assert parse_time_to_sec(end_events[0]["time"]) == 10800
 
 
+def test_parse_time_hh_mm_not_mm_ss():
+    assert parse_time_to_sec("00:03") == 180
+    assert parse_time_to_sec("01:55") == 6900
+    assert parse_time_to_sec("02:59:30") == 10770
+
+
 def test_start_stop_resume(db_session):
     from app.services.timeline_service import seed_timeline_from_json
 

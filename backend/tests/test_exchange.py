@@ -18,6 +18,7 @@ from app.services.news_service import create_news, effective_impact, release_new
 from app.services.market_model import compute_signals
 from app.ai.runner import build_strategy, seed_default_agents
 from app.ai.base import MarketView
+from tests.conftest import join_participant
 
 
 def test_price_time_priority_and_partial_fill():
@@ -255,8 +256,8 @@ def test_seed_ai_agents(db_session):
 
 def test_api_match_flow(client):
     books.clear()
-    a = client.post("/api/v1/traders", json={"name": "Buyer"}).json()
-    b = client.post("/api/v1/traders", json={"name": "Seller"}).json()
+    buyer_id, buyer_auth = join_participant(client, "Buyer")
+    seller_id, seller_auth = join_participant(client, "Seller")
     stock = client.post(
         "/api/v1/stocks",
         json={
@@ -269,32 +270,34 @@ def test_api_match_flow(client):
         },
     ).json()
     client.put(
-        f"/api/v1/traders/{b['id']}/holdings",
+        f"/api/v1/traders/{seller_id}/holdings",
         json={"stock_id": stock["id"], "quantity": 100, "avg_cost": "100"},
     )
     client.post("/api/v1/admin/session/start")
     sell = client.post(
         "/api/v1/orders",
         json={
-            "trader_id": b["id"],
+            "trader_id": seller_id,
             "stock_id": stock["id"],
             "side": "sell",
             "order_type": "limit",
             "quantity": 100,
             "price": "100",
         },
+        headers=seller_auth,
     )
     assert sell.status_code == 201
     buy = client.post(
         "/api/v1/orders",
         json={
-            "trader_id": a["id"],
+            "trader_id": buyer_id,
             "stock_id": stock["id"],
             "side": "buy",
             "order_type": "limit",
             "quantity": 100,
             "price": "100",
         },
+        headers=buyer_auth,
     )
     assert buy.status_code == 201
     body = buy.json()
