@@ -30,11 +30,20 @@ $COMPOSE run --rm backend alembic upgrade head
 echo "==> Start all services"
 $COMPOSE up -d
 
+FRONTEND_URL=""
+if [[ -f .env ]]; then
+  FRONTEND_URL="$(grep -E '^FRONTEND_URL=' .env | head -1 | cut -d= -f2- | tr -d '\r' || true)"
+fi
+
 echo ""
 echo "TRADEVERSE is running."
 echo "  Localhost:  http://localhost/terminal"
 echo "  LAN:        http://<YOUR_LAN_IP>/terminal  (find IP: ipconfig on Windows)"
+if [[ -n "${FRONTEND_URL:-}" && "${FRONTEND_URL}" == https://* ]]; then
+  echo "  ngrok:      ${FRONTEND_URL}/terminal"
+fi
 echo "  Admin:      http://localhost/admin"
 echo "  Health:     http://localhost/api/v1/health"
 echo ""
+echo "For ngrok: run 'ngrok http 80' in another terminal, then set FRONTEND_URL in .env."
 echo "Run scripts/local/health-check.sh to verify."
