@@ -4,6 +4,14 @@ import type { LeaderboardRow } from "@/components/Leaderboard";
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
 const REQUEST_TIMEOUT_MS = 30_000;
 
+function defaultHeaders(): HeadersInit {
+  const headers: Record<string, string> = {};
+  if (typeof window !== "undefined" && window.location.hostname.endsWith(".ngrok-free.dev")) {
+    headers["ngrok-skip-browser-warning"] = "1";
+  }
+  return headers;
+}
+
 function isProductionBuild(): boolean {
   return process.env.NODE_ENV === "production";
 }
@@ -56,7 +64,7 @@ async function fetchWithTimeout(
   try {
     return await fetch(input, {
       ...init,
-      headers: { ...authHeaders(), ...(init?.headers ?? {}) },
+      headers: { ...defaultHeaders(), ...authHeaders(), ...(init?.headers ?? {}) },
       signal: controller.signal,
     });
   } catch (e) {
@@ -213,8 +221,19 @@ export async function adminPost<T>(path: string, body?: unknown): Promise<T> {
   return res.json();
 }
 
-export async function adminGet<T>(path: string): Promise<T> {
-  const res = await fetchWithTimeout(apiUrl(path), {
+export async function adminGet<T>(
+  path: string,
+  params?: Record<string, string | boolean | number>,
+): Promise<T> {
+  let url = apiUrl(path);
+  if (params && Object.keys(params).length > 0) {
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      qs.set(key, String(value));
+    }
+    url = `${url}?${qs.toString()}`;
+  }
+  const res = await fetchWithTimeout(url, {
     cache: "no-store",
     headers: getAdminAuthHeaders(),
   });

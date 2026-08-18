@@ -1,6 +1,8 @@
 "use client";
 
+import { useMemo } from "react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import type { PricePoint } from "@/hooks/usePriceChart";
 import { fmtPct, num, signClass } from "@/lib/marketFormat";
 import type { SidebarStock } from "./StockSidebar";
 
@@ -9,13 +11,19 @@ const DOWN = "#ef4444";
 
 type Props = {
   stock: SidebarStock | null;
-  priceSeries: Array<{ t: string; px: number }>;
+  priceSeries: PricePoint[];
+  chartLoading?: boolean;
   qty: number;
   onQtyChange: (n: number) => void;
   holdingQty: number;
+  tradingEnabled: boolean;
   onBuy: () => void;
   onSell: () => void;
-  submitting: boolean;
+  confirmSide: "buy" | "sell" | null;
+  confirmLoading: boolean;
+  confirmError: string | null;
+  onConfirm: () => void;
+  onCancelConfirm: () => void;
   ipo?: {
     id: number;
     company_name: string;
@@ -32,12 +40,18 @@ type Props = {
 export function TradePanel({
   stock,
   priceSeries,
+  chartLoading = false,
   qty,
   onQtyChange,
   holdingQty,
+  tradingEnabled,
   onBuy,
   onSell,
-  submitting,
+  confirmSide,
+  confirmLoading,
+  confirmError,
+  onConfirm,
+  onCancelConfirm,
   ipo,
   ipoLots,
   onIpoLotsChange,
@@ -45,6 +59,18 @@ export function TradePanel({
 }: Props) {
   const chartStroke =
     priceSeries.length >= 2 && priceSeries[priceSeries.length - 1].px >= priceSeries[0].px ? UP : DOWN;
+
+  const yDomain = useMemo((): [number, number] => {
+    if (priceSeries.length === 0) return [0, 1];
+    const prices = priceSeries.map((p) => p.px);
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const pad = Math.max((max - min) * 0.02, max * 0.005, 0.05);
+    return [min - pad, max + pad];
+  }, [priceSeries]);
+
+  const estimatedValue = stock ? qty * num(stock.last_traded_price) : 0;
+  const canTrade = tradingEnabled && !!stock;
   const inputCls = "w-full border border-white/25 bg-black px-2 py-2 text-white outline-none focus:border-white";
 
   return (
@@ -62,16 +88,32 @@ export function TradePanel({
         </div>
       </div>
 
-      <div className="mt-4 h-44 border border-white/10 p-2">
+      <div className="relative mt-4 h-72 border border-white/10 p-2 lg:h-96">
+        {chartLoading && priceSeries.length === 0 && (
+          <p className="absolute inset-0 flex items-center justify-center text-xs text-white/30">Loading chart…</p>
+        )}
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={priceSeries}>
             <XAxis dataKey="t" hide />
-            <YAxis domain={["auto", "auto"]} width={48} tick={{ fill: "#888", fontSize: 10 }} />
+            <YAxis domain={yDomain} width={48} tick={{ fill: "#888", fontSize: 10 }} />
             <Tooltip contentStyle={{ background: "#000", border: "1px solid #333", fontSize: 11 }} />
-            <Line type="monotone" dataKey="px" stroke={chartStroke} strokeWidth={1.5} dot={false} />
+            <Line
+              type="monotone"
+              dataKey="px"
+              stroke={chartStroke}
+              strokeWidth={1.5}
+              dot={false}
+              isAnimationActive={false}
+            />
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      {!tradingEnabled && (
+        <p className="mt-3 border border-yellow-700/40 bg-yellow-900/20 px-3 py-2 text-xs text-yellow-300">
+          Trading opens when admin starts the simulation.
+        </p>
+      )}
 
       <div className="mt-4 max-w-xs">
         <label className="text-[10px] text-white/40">Quantity</label>
@@ -88,7 +130,8 @@ export function TradePanel({
       <div className="mt-4 grid max-w-md grid-cols-2 gap-2">
         <button
           type="button"
-          disabled={submitting || !stock}
+          disabled={!canTrade}
+          title={!tradingEnabled ? "Wait for admin to start simulation" : undefined}
           className="bg-[#22c55e] py-3 text-black disabled:opacity-40"
           onClick={onBuy}
         >
@@ -96,7 +139,8 @@ export function TradePanel({
         </button>
         <button
           type="button"
-          disabled={submitting || !stock}
+          disabled={!canTrade}
+          title={!tradingEnabled ? "Wait for admin to start simulation" : undefined}
           className="bg-[#ef4444] py-3 text-black disabled:opacity-40"
           onClick={onSell}
         >
@@ -122,6 +166,39 @@ export function TradePanel({
             <button type="button" className="border border-white/30 px-4" onClick={onIpoApply}>
               APPLY
             </button>
+          </div>
+        </div>
+      )}
+
+      {confirmSide && stock && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
+          <div className="w-full max-w-sm border border-white/25 bg-black p-4">
+            <p className="text-xs text-white/40">Confirm order</p>
+            <p className="mt-2 text-lg">
+              {confirmSide === "buy" ? "Buy" : "Sell"} {qty} × {stock.ticker}
+            </p>
+            <p className="mt-1 text-sm text-white/50">
+              Est. value ₹{estimatedValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+            </p>
+            {confirmError && <p className="mt-2 text-xs text-[#ef4444]">{confirmError}</p>}
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                className="flex-1 border border-white/25 py-2"
+                disabled={confirmLoading}
+                onClick={onCancelConfirm}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={`flex-1 py-2 text-black ${confirmSide === "buy" ? "bg-[#22c55e]" : "bg-[#ef4444]"}`}
+                disabled={confirmLoading}
+                onClick={onConfirm}
+              >
+                {confirmLoading ? "Submitting…" : "Confirm"}
+              </button>
+            </div>
           </div>
         </div>
       )}

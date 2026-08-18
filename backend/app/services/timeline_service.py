@@ -191,22 +191,49 @@ def list_timeline_events(db: Session) -> list[TimelineEvent]:
     )
 
 
-def progress_snapshot(db: Session, elapsed_sec: float) -> dict[str, Any]:
-    events = list_timeline_events(db)
-    total = len(events)
-    executed = sum(1 for e in events if e.status == TimelineEventStatus.EXECUTED)
-    current = None
-    nxt = None
-    for e in events:
-        if e.status == TimelineEventStatus.EXECUTED:
-            current = e
-        elif e.status == TimelineEventStatus.PENDING and nxt is None:
-            nxt = e
-            break
+def progress_snapshot(
+    db: Session, elapsed_sec: float, *, include_checkpoints: bool = True
+) -> dict[str, Any]:
+    total = db.scalar(select(func.count(TimelineEvent.id))) or 0
+    executed = db.scalar(
+        select(func.count(TimelineEvent.id)).where(
+            TimelineEvent.status == TimelineEventStatus.EXECUTED
+        )
+    ) or 0
+
+    if include_checkpoints:
+        events = list_timeline_events(db)
+        current = None
+        nxt = None
+        for e in events:
+            if e.status == TimelineEventStatus.EXECUTED:
+                current = e
+            elif e.status == TimelineEventStatus.PENDING and nxt is None:
+                nxt = e
+                break
+        current_cp = current.checkpoint_id if current else None
+        checkpoints = [
+            _event_dict(e, is_current=e.checkpoint_id == current_cp and current is not None)
+            for e in events
+        ]
+    else:
+        current = db.scalar(
+            select(TimelineEvent)
+            .where(TimelineEvent.status == TimelineEventStatus.EXECUTED)
+            .order_by(TimelineEvent.sim_offset_sec.desc(), TimelineEvent.id.desc())
+            .limit(1)
+        )
+        nxt = db.scalar(
+            select(TimelineEvent)
+            .where(TimelineEvent.status == TimelineEventStatus.PENDING)
+            .order_by(TimelineEvent.sim_offset_sec, TimelineEvent.id)
+            .limit(1)
+        )
+        checkpoints = []
+
     seconds_to_next = None
     if nxt is not None:
         seconds_to_next = max(0.0, nxt.sim_offset_sec - elapsed_sec)
-    current_cp = current.checkpoint_id if current else None
     return {
         "total_checkpoint_count": total,
         "completed_checkpoint_count": executed,
@@ -214,10 +241,7 @@ def progress_snapshot(db: Session, elapsed_sec: float) -> dict[str, Any]:
         "current_event": _event_dict(current, is_current=True) if current else None,
         "next_event": _event_dict(nxt) if nxt else None,
         "seconds_to_next_event": seconds_to_next,
-        "checkpoints": [
-            _event_dict(e, is_current=e.checkpoint_id == current_cp and current is not None)
-            for e in events
-        ],
+        "checkpoints": checkpoints,
     }
 
 

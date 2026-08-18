@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NewsPanel, type NewsItem } from "@/components/NewsPanel";
 import { useMarketWebSocket } from "@/hooks/useMarketWebSocket";
 import { adminGet, adminLogin, adminPost } from "@/lib/api";
@@ -33,6 +33,14 @@ function fmtCountdown(sec: number | null | undefined) {
   return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
 }
 
+function mergeStatus(prev: SimStatus | null, next: Partial<SimStatus>): SimStatus {
+  const checkpoints =
+    next.checkpoints && next.checkpoints.length > 0
+      ? next.checkpoints
+      : prev?.checkpoints ?? [];
+  return { ...(prev ?? (next as SimStatus)), ...next, checkpoints };
+}
+
 export default function AdminPage() {
   const [status, setStatus] = useState<SimStatus | null>(null);
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -42,6 +50,7 @@ export default function AdminPage() {
 
   const [adminToken, setAdminToken] = useState<string | null>(null);
   const [secret, setSecret] = useState("");
+  const statusInflight = useRef(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -49,15 +58,26 @@ export default function AdminPage() {
     }
   }, []);
 
-  const refreshStatus = useCallback(async () => {
-    if (!adminToken) return;
-    try {
-      const data = await adminGet<SimStatus>("/admin/simulation/status");
-      setStatus(data);
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : "Failed to load status");
-    }
-  }, [adminToken]);
+  const refreshStatus = useCallback(
+    async (opts?: { includeCheckpoints?: boolean; quiet?: boolean }) => {
+      if (!adminToken || statusInflight.current) return;
+      statusInflight.current = true;
+      try {
+        const data = await adminGet<SimStatus>("/admin/simulation/status", {
+          include_checkpoints: opts?.includeCheckpoints ?? false,
+        });
+        setStatus((prev) => mergeStatus(prev, data));
+        if (!opts?.quiet) setMsg("");
+      } catch (e) {
+        if (!opts?.quiet) {
+          setMsg(e instanceof Error ? e.message : "Failed to load status");
+        }
+      } finally {
+        statusInflight.current = false;
+      }
+    },
+    [adminToken],
+  );
 
   const refreshNews = useCallback(async () => {
     if (!adminToken) return;
@@ -71,12 +91,11 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!adminToken) return;
-    refreshStatus();
+    refreshStatus({ includeCheckpoints: true });
     refreshNews();
     const id = setInterval(() => {
-      refreshStatus();
-      refreshNews();
-    }, 2000);
+      refreshStatus({ includeCheckpoints: false, quiet: true });
+    }, 8000);
     return () => clearInterval(id);
   }, [refreshStatus, refreshNews, adminToken]);
 
@@ -84,6 +103,10 @@ export default function AdminPage() {
     onMessage: (msg) => {
       if (msg.event === "NEWS_RELEASED") {
         refreshNews();
+      }
+      if (msg.event === "SIMULATION_CLOCK" || msg.event === "SIMULATION_STATUS") {
+        const payload = (msg.payload ?? msg) as Partial<SimStatus>;
+        setStatus((prev) => mergeStatus(prev, payload));
       }
     },
   });
@@ -95,7 +118,7 @@ export default function AdminPage() {
     try {
       await adminPost(`/admin/simulation/${action}`);
       setMsg(`${action.toUpperCase()} OK`);
-      await refreshStatus();
+      await refreshStatus({ includeCheckpoints: true });
       if (action === "reset") {
         setNews([]);
         setSelectedNews(null);
@@ -190,7 +213,8 @@ export default function AdminPage() {
             {fmtCountdown(status.seconds_to_next_event)}
           </p>
           <p className="text-sm text-neutral-400">
-            Checkpoints {status.completed_checkpoint_count}/{status.total_checkpoint_count} · Status: {status.status}
+            Checkpoints {status.completed_checkpoint_count}/{status.total_checkpoint_count} · Status:{" "}
+            {status.status}
           </p>
         </section>
       )}

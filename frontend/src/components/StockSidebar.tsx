@@ -38,23 +38,32 @@ type Props = {
 };
 
 export function StockSidebar({ sectors, dissolved = [], selectedId, onSelect }: Props) {
-  const sectorKeys = useMemo(() => sectors.map((s) => s.slug), [sectors]);
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
-
-  const expanded = useMemo(() => {
-    const next = new Set(sectorKeys);
-    for (const key of collapsed) next.delete(key);
-    return next;
-  }, [sectorKeys, collapsed]);
+  const [expandedSectors, setExpandedSectors] = useState<Set<string>>(() => new Set());
 
   function toggleSector(slug: string) {
-    setCollapsed((prev) => {
+    setExpandedSectors((prev) => {
       const next = new Set(prev);
       if (next.has(slug)) next.delete(slug);
       else next.add(slug);
       return next;
     });
   }
+
+  const dissolvedBlock = useMemo(() => {
+    if (!dissolved.length) return null;
+    return (
+      <div className="border-t border-white/10 px-3 py-2">
+        <p className="text-[10px] uppercase tracking-wide text-white/40">Dissolved</p>
+        <ul>
+          {dissolved.map((s) => (
+            <li key={s.id} className="px-1 py-1 text-[10px] text-white/30">
+              {s.ticker} · not tradable
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }, [dissolved]);
 
   return (
     <aside className="flex h-full flex-col border border-white/15 bg-black">
@@ -63,7 +72,7 @@ export function StockSidebar({ sectors, dissolved = [], selectedId, onSelect }: 
       </p>
       <div className="flex-1 overflow-y-auto">
         {sectors.map((sector) => {
-          const isOpen = expanded.has(sector.slug);
+          const isOpen = expandedSectors.has(sector.slug);
           const avg = sector.sector_change_pct;
           return (
             <div key={sector.slug} className="border-b border-white/5">
@@ -112,18 +121,7 @@ export function StockSidebar({ sectors, dissolved = [], selectedId, onSelect }: 
           );
         })}
         {!sectors.length && <p className="p-3 text-xs text-white/30">Loading stocks…</p>}
-        {dissolved.length > 0 && (
-          <div className="border-t border-white/10 px-3 py-2">
-            <p className="text-[10px] uppercase tracking-wide text-white/40">Dissolved</p>
-            <ul>
-              {dissolved.map((s) => (
-                <li key={s.id} className="px-1 py-1 text-[10px] text-white/30">
-                  {s.ticker} · not tradable
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {dissolvedBlock}
       </div>
     </aside>
   );

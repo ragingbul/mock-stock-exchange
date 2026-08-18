@@ -62,12 +62,15 @@ async def simulation_reset(db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/simulation/status")
-def simulation_status(db: Session = Depends(get_db)) -> dict:
+def simulation_status(
+    db: Session = Depends(get_db),
+    include_checkpoints: bool = True,
+) -> dict:
     from app.services.simulation_clock import status_dict
     from app.services.timeline_service import progress_snapshot
 
     state = status_dict(db)
-    progress = progress_snapshot(db, state["elapsed_sec"])
+    progress = progress_snapshot(db, state["elapsed_sec"], include_checkpoints=include_checkpoints)
     return {**state, **progress}
 
 

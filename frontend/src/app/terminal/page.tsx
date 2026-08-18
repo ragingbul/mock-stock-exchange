@@ -8,8 +8,8 @@ import { StockSidebar, type SectorGroup, type SidebarStock } from "@/components/
 import { TradePanel } from "@/components/TradePanel";
 import { WalletBar } from "@/components/WalletBar";
 import { useMarketWebSocket } from "@/hooks/useMarketWebSocket";
+import { usePriceChart, type PriceUpdatePayload } from "@/hooks/usePriceChart";
 import { apiGet, apiPost, fetchSessionBootstrap, joinSession } from "@/lib/api";
-import { num } from "@/lib/marketFormat";
 
 type Wallet = {
   available_cash: string;
@@ -31,6 +31,11 @@ type IPO = {
   maximum_lots_per_user: number;
 };
 
+type SimulationState = {
+  status?: string;
+  trading_enabled?: boolean;
+};
+
 export default function TerminalPage() {
   const [traderId, setTraderId] = useState<number | null>(null);
   const [traderName, setTraderName] = useState("Trader");
@@ -45,16 +50,22 @@ export default function TerminalPage() {
   const [ipos, setIpos] = useState<IPO[]>([]);
   const [ipoLots, setIpoLots] = useState(1);
   const [qty, setQty] = useState(10);
-  const [priceSeries, setPriceSeries] = useState<Array<{ t: string; px: number }>>([]);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [confirmSide, setConfirmSide] = useState<"buy" | "sell" | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [tradingEnabled, setTradingEnabled] = useState(false);
   const [wsStatus, setWsStatus] = useState<"LIVE" | "OFF" | "Reconnecting">("OFF");
 
   const selected = useMemo(
     () => stocks.find((s) => s.id === selectedId) ?? null,
     [stocks, selectedId],
+  );
+
+  const { priceSeries, chartLoading, handlePriceUpdate } = usePriceChart(
+    selectedId,
+    selected?.last_traded_price,
   );
 
   const holdingQty = useMemo(() => {
@@ -66,6 +77,29 @@ export default function TerminalPage() {
     () => stocks.filter((s) => s.is_open === false),
     [stocks],
   );
+
+  const patchStockPrice = useCallback((stockId: number, ltp: string) => {
+    setStocks((prev) =>
+      prev.map((s) => (s.id === stockId ? { ...s, last_traded_price: ltp } : s)),
+    );
+    setSectors((prev) =>
+      prev.map((sector) => ({
+        ...sector,
+        stocks: sector.stocks.map((s) =>
+          s.stock_id === stockId ? { ...s, last_traded_price: ltp } : s,
+        ),
+      })),
+    );
+  }, []);
+
+  const applySimulationState = useCallback((sim: SimulationState | undefined) => {
+    if (!sim) return;
+    if (typeof sim.trading_enabled === "boolean") {
+      setTradingEnabled(sim.trading_enabled);
+    } else if (sim.status) {
+      setTradingEnabled(sim.status === "running");
+    }
+  }, []);
 
   const refreshStocks = useCallback(async () => {
     const s = await apiGet<SidebarStock[]>("/stocks");
@@ -80,32 +114,38 @@ export default function TerminalPage() {
     return data;
   }, []);
 
-  const applyBootstrap = useCallback((data: Awaited<ReturnType<typeof fetchSessionBootstrap>>) => {
-    setTraderId(data.trader_id);
-    setWallet({
-      available_cash: data.wallet.available_cash,
-      portfolio_value: data.wallet.portfolio_value,
-      total_pnl: data.wallet.total_pnl ?? "0",
-      return_pct: data.wallet.return_pct ?? "0",
-    });
-    setPortfolio(data.portfolio);
-    if (data.stocks?.length) {
-      setStocks(
-        data.stocks.map((s) => ({
-          id: s.id,
-          ticker: s.ticker,
-          company_name: s.company_name ?? s.ticker,
-          last_traded_price: s.ltp ?? s.last_traded_price ?? "0",
-          percent_change: s.percent_change ?? null,
-          is_open: s.is_open ?? true,
-        })),
-      );
-      if (!selectedId) setSelectedId(data.stocks.find((s) => s.is_open !== false)?.id ?? data.stocks[0].id);
-    }
-    if (data.sectors?.length) setSectors(data.sectors);
-    if (data.leaderboard?.length) setLeaderboard(data.leaderboard);
-    if (data.open_ipos?.length) setIpos(data.open_ipos);
-  }, [selectedId]);
+  const applyBootstrap = useCallback(
+    (data: Awaited<ReturnType<typeof fetchSessionBootstrap>>) => {
+      setTraderId(data.trader_id);
+      setWallet({
+        available_cash: data.wallet.available_cash,
+        portfolio_value: data.wallet.portfolio_value,
+        total_pnl: data.wallet.total_pnl ?? "0",
+        return_pct: data.wallet.return_pct ?? "0",
+      });
+      setPortfolio(data.portfolio);
+      applySimulationState(data.simulation as SimulationState);
+      if (data.stocks?.length) {
+        setStocks(
+          data.stocks.map((s) => ({
+            id: s.id,
+            ticker: s.ticker,
+            company_name: s.company_name ?? s.ticker,
+            last_traded_price: s.ltp ?? s.last_traded_price ?? "0",
+            percent_change: s.percent_change ?? null,
+            is_open: s.is_open ?? true,
+          })),
+        );
+        if (!selectedId) {
+          setSelectedId(data.stocks.find((s) => s.is_open !== false)?.id ?? data.stocks[0].id);
+        }
+      }
+      if (data.sectors?.length) setSectors(data.sectors);
+      if (data.leaderboard?.length) setLeaderboard(data.leaderboard);
+      if (data.open_ipos?.length) setIpos(data.open_ipos);
+    },
+    [selectedId, applySimulationState],
+  );
 
   const resyncBootstrap = useCallback(async () => {
     const token = localStorage.getItem("mse_access_token");
@@ -130,63 +170,29 @@ export default function TerminalPage() {
     setLeaderboard(lb);
   }, [traderId]);
 
-  const refreshChart = useCallback(async (stockId: number, stockList?: SidebarStock[]) => {
-    const list = stockList ?? stocks;
-    const stockTrades = await apiGet<Array<{ id: number; price: string; executed_at?: string }>>(
-      `/trades?stock_id=${stockId}&limit=120`,
-    );
-    const sorted = [...stockTrades].sort((a, b) =>
-      String(a.executed_at ?? a.id).localeCompare(String(b.executed_at ?? b.id)),
-    );
-    const stock = list.find((x) => x.id === stockId);
-    if (sorted.length > 0) {
-      setPriceSeries(
-        sorted.map((tr) => ({
-          t: tr.executed_at
-            ? new Date(tr.executed_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-            : `#${tr.id}`,
-          px: num(tr.price),
-        })),
-      );
-    } else if (stock) {
-      setPriceSeries([{ t: "now", px: num(stock.last_traded_price) }]);
-    }
-  }, [stocks]);
-
-  const refreshMarket = useCallback(async () => {
-    await Promise.all([refreshStocks(), refreshSectors()]);
-  }, [refreshStocks, refreshSectors]);
-
   const refresh = useCallback(async () => {
     try {
-      const s = await refreshStocks();
+      await refreshStocks();
       await refreshSectors();
       const openIpos = await apiGet<IPO[]>("/ipos/open").catch(() => [] as IPO[]);
       setIpos(openIpos);
       if (traderId) await refreshWallet();
-      if (selectedId) await refreshChart(selectedId, s);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load data");
     }
-  }, [refreshStocks, refreshSectors, refreshWallet, refreshChart, traderId, selectedId]);
+  }, [refreshStocks, refreshSectors, refreshWallet, traderId]);
 
   useEffect(() => {
-    refresh();
-    const id = window.setInterval(refresh, 12000);
-    return () => window.clearInterval(id);
+    void refresh();
   }, [refresh]);
-
-  useEffect(() => {
-    if (selectedId) refreshChart(selectedId);
-  }, [selectedId, refreshChart]);
 
   useEffect(() => {
     const saved = localStorage.getItem("mse_trader_id");
     const token = localStorage.getItem("mse_access_token");
     if (saved && token) {
       setTraderId(Number(saved));
-      resyncBootstrap();
+      void resyncBootstrap();
     }
   }, [resyncBootstrap]);
 
@@ -195,7 +201,7 @@ export default function TerminalPage() {
     onClose: () => setWsStatus("Reconnecting"),
     onReconnect: () => {
       setWsStatus("LIVE");
-      resyncBootstrap();
+      void resyncBootstrap();
     },
     onMessage: (msg) => {
       if (msg.event === "NEWS_RELEASED") {
@@ -209,19 +215,32 @@ export default function TerminalPage() {
           });
         }
       }
-      if (msg.event === "PRICE_UPDATED" || msg.event === "TRADE_EXECUTED") {
-        refreshMarket();
-        if (selectedId) refreshChart(selectedId);
+      if (msg.event === "SIMULATION_CLOCK" || msg.event === "SIMULATION_STATUS") {
+        applySimulationState((msg.payload ?? msg) as SimulationState);
+      }
+      if (msg.event === "PRICE_UPDATED") {
+        const payload = (msg.payload ?? msg) as PriceUpdatePayload;
+        handlePriceUpdate(payload);
+        const stockId = payload.stock_id;
+        if (stockId) {
+          const ltp =
+            payload.ltp ??
+            (payload.trades?.length ? payload.trades[payload.trades.length - 1].price : undefined);
+          if (ltp) patchStockPrice(stockId, ltp);
+        }
+      }
+      if (msg.event === "TRADE_EXECUTED") {
+        void refreshWallet();
       }
       if (msg.event === "WALLET_UPDATED" || msg.event === "PORTFOLIO_UPDATED") {
-        refreshWallet();
+        void refreshWallet();
       }
       if (msg.event === "LEADERBOARD_UPDATE") {
         apiGet<LeaderboardRow[]>("/leaderboard").then(setLeaderboard).catch(() => {});
       }
       if (msg.event === "IPO_OPENED" || msg.event === "IPO_RESULT" || msg.event === "IPO_LISTED") {
         apiGet<IPO[]>("/ipos/open").then(setIpos).catch(() => []);
-        refreshWallet();
+        void refreshWallet();
       }
     },
   });
@@ -229,6 +248,18 @@ export default function TerminalPage() {
   useEffect(() => {
     if (reconnecting) setWsStatus("Reconnecting");
   }, [reconnecting]);
+
+  useEffect(() => {
+    if (connected) return;
+    const id = window.setInterval(() => void refresh(), 12000);
+    return () => window.clearInterval(id);
+  }, [connected, refresh]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = window.setTimeout(() => setToast(null), 4000);
+    return () => window.clearTimeout(id);
+  }, [toast]);
 
   async function join() {
     try {
@@ -241,28 +272,43 @@ export default function TerminalPage() {
     }
   }
 
-  async function executeOrder(side: "buy" | "sell") {
-    if (!traderId || !selectedId) return;
-    setSubmitting(true);
-    setError(null);
+  function openConfirm(side: "buy" | "sell") {
+    setConfirmError(null);
+    setConfirmSide(side);
+  }
+
+  function closeConfirm() {
+    if (confirmLoading) return;
+    setConfirmSide(null);
+    setConfirmError(null);
+  }
+
+  async function executeOrder() {
+    if (!traderId || !selectedId || !confirmSide) return;
+    setConfirmLoading(true);
+    setConfirmError(null);
     try {
-      const res = await apiPost<{ execution_summary?: { executed: boolean; message: string } }>("/orders", {
+      const res = await apiPost<{
+        execution_summary?: { executed: boolean; message: string };
+      }>("/orders", {
         trader_id: traderId,
         stock_id: selectedId,
-        side,
+        side: confirmSide,
         order_type: "market",
         quantity: qty,
         price: null,
       });
       if (res.execution_summary && !res.execution_summary.executed) {
-        setError(res.execution_summary.message);
+        setConfirmError(res.execution_summary.message);
+        return;
       }
+      setToast(res.execution_summary?.message ?? `${confirmSide.toUpperCase()} order placed`);
       setConfirmSide(null);
-      await refresh();
+      await refreshWallet();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Order failed");
+      setConfirmError(e instanceof Error ? e.message : "Order failed");
     } finally {
-      setSubmitting(false);
+      setConfirmLoading(false);
     }
   }
 
@@ -271,7 +317,7 @@ export default function TerminalPage() {
     try {
       await apiPost(`/ipos/${ipos[0].id}/apply`, { trader_id: traderId, requested_lots: ipoLots });
       setToast("IPO applied");
-      await refresh();
+      await refreshWallet();
     } catch (e) {
       setError(e instanceof Error ? e.message : "IPO failed");
     }
@@ -317,20 +363,23 @@ export default function TerminalPage() {
           sectors={sectors}
           dissolved={dissolvedStocks}
           selectedId={selectedId}
-          onSelect={(id) => {
-            setSelectedId(id);
-            setPriceSeries([]);
-          }}
+          onSelect={setSelectedId}
         />
         <TradePanel
           stock={selected}
           priceSeries={priceSeries}
+          chartLoading={chartLoading}
           qty={qty}
           onQtyChange={setQty}
           holdingQty={holdingQty}
-          onBuy={() => setConfirmSide("buy")}
-          onSell={() => setConfirmSide("sell")}
-          submitting={submitting}
+          tradingEnabled={tradingEnabled}
+          onBuy={() => openConfirm("buy")}
+          onSell={() => openConfirm("sell")}
+          confirmSide={confirmSide}
+          confirmLoading={confirmLoading}
+          confirmError={confirmError}
+          onConfirm={() => void executeOrder()}
+          onCancelConfirm={closeConfirm}
           ipo={ipos[0] ?? null}
           ipoLots={ipoLots}
           onIpoLotsChange={setIpoLots}
@@ -352,30 +401,6 @@ export default function TerminalPage() {
           <button type="button" className="ml-3 text-white/40" onClick={() => setToast(null)}>
             ×
           </button>
-        </div>
-      )}
-
-      {confirmSide && selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
-          <div className="w-full max-w-sm border border-white/25 bg-black p-4">
-            <p className="text-xs text-white/40">Confirm</p>
-            <p className="mt-2 text-lg">
-              {confirmSide === "buy" ? "Buy" : "Sell"} {qty} {selected.ticker}
-            </p>
-            <div className="mt-4 flex gap-2">
-              <button type="button" className="flex-1 border border-white/25 py-2" onClick={() => setConfirmSide(null)}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                className={`flex-1 py-2 text-black ${confirmSide === "buy" ? "bg-[#22c55e]" : "bg-[#ef4444]"}`}
-                disabled={submitting}
-                onClick={() => executeOrder(confirmSide)}
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>
