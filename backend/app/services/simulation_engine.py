@@ -1,0 +1,267 @@
+"""Server-owned simulation loop — clock, events, AI ticks, broadcasts."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from typing import Any
+
+from sqlalchemy import select, text
+from sqlalchemy.engine import Connection
+
+from app.core.config import get_settings
+from app.core.database import SessionLocal, engine
+from app.models import Stock
+from app.models.enums import SimulationStatus
+from app.realtime.ws_manager import manager
+from app.services.event_processor import process_due_events
+from app.services.simulation_clock import advance_clock, get_or_create_state, status_dict
+from app.services.simulation_settings_service import get_or_create_settings
+
+logger = logging.getLogger(__name__)
+
+_task: asyncio.Task | None = None
+_stop = asyncio.Event()
+_lock_conn: Connection | None = None
+AI_TICK_INTERVAL_SEC = 30.0
+CLOCK_BROADCAST_INTERVAL = 10.0
+_last_clock_broadcast = 0.0
+ADVISORY_LOCK_ID = 8675309
+
+
+def _run_ai_tick(db, elapsed: float) -> list[dict]:
+    from app.ai import runner as ai_runner
+
+    state = get_or_create_state(db)
+    state.last_ai_tick_elapsed_sec = elapsed
+    db.commit()
+    return ai_runner.run_all_agents(db)
+
+
+def _ai_broadcast_messages(db, elapsed: float, results: list[dict]) -> list[tuple[str, dict[str, Any]]]:
+    messages: list[tuple[str, dict[str, Any]]] = []
+    traded_ids = {
+        r["stock_id"] for r in results if r.get("trades", 0) > 0 and r.get("stock_id")
+    }
+    if traded_ids:
+        for stock in db.scalars(select(Stock).where(Stock.id.in_(traded_ids))).all():
+            messages.append(
+                (
+                    "PRICE_UPDATED",
+                    {
+                        "ticker": stock.ticker,
+                        "ltp": str(stock.last_traded_price),
+                        "stock_id": stock.id,
+                    },
+                )
+            )
+    messages.append(("LEADERBOARD_UPDATE", {"sim_elapsed_sec": elapsed}))
+    messages.append(("AI_TICK", {"sim_elapsed_sec": elapsed, "actions": len(results)}))
+    return messages
+
+
+async def _broadcast_messages(messages: list[tuple[str, dict[str, Any]]]) -> None:
+    for event, payload in messages:
+        await manager.broadcast(event, payload)
+
+
+async def _maybe_run_ai_tick(elapsed: float) -> None:
+    try:
+        with SessionLocal() as db:
+            settings = get_or_create_settings(db)
+            if not settings.simulation_ai_enabled:
+                return
+            state = get_or_create_state(db)
+            if elapsed - float(state.last_ai_tick_elapsed_sec) < AI_TICK_INTERVAL_SEC:
+                return
+            results = _run_ai_tick(db, elapsed)
+            messages = _ai_broadcast_messages(db, elapsed, results)
+        logger.info("AI tick at sim=%.0fs: %s actions", elapsed, len(results))
+        await _broadcast_messages(messages)
+    except Exception:  # noqa: BLE001
+        logger.exception("AI tick failed — simulation continues")
+
+
+async def _immediate_news_reaction(elapsed: float) -> None:
+    """Pulse liquidity and run AI immediately after a timeline NEWS event."""
+    try:
+        with SessionLocal() as db:
+            settings = get_or_create_settings(db)
+            if not settings.simulation_ai_enabled:
+                return
+            from app.services.liquidity_service import provision_two_sided_quotes
+
+            stocks = list(db.scalars(select(Stock).where(Stock.is_open.is_(True))).all())
+            for stock in stocks:
+                try:
+                    provision_two_sided_quotes(db, stock)
+                except Exception:  # noqa: BLE001
+                    logger.debug("MM quote refresh failed for %s", stock.ticker, exc_info=True)
+            results = _run_ai_tick(db, elapsed)
+            messages = _ai_broadcast_messages(db, elapsed, results)
+        logger.info("Immediate news AI tick at sim=%.0fs: %s actions", elapsed, len(results))
+        await _broadcast_messages(messages)
+    except Exception:  # noqa: BLE001
+        logger.exception("Immediate news AI tick failed — simulation continues")
+
+
+def _acquire_advisory_lock() -> bool:
+    """Return True if this process owns the simulation loop (Postgres) or SQLite dev."""
+    global _lock_conn
+    settings = get_settings()
+    if settings.database_url.startswith("sqlite"):
+        logger.info("Simulation worker starting (sqlite — single process assumed)")
+        return True
+    try:
+        _lock_conn = engine.connect()
+        acquired = _lock_conn.execute(
+            text(f"SELECT pg_try_advisory_lock({ADVISORY_LOCK_ID})")
+        ).scalar()
+        if not acquired:
+            logger.error("ADVISORY LOCK NOT ACQUIRED — simulation worker will not start")
+            _lock_conn.close()
+            _lock_conn = None
+            return False
+        _lock_conn.commit()
+        logger.info("ADVISORY LOCK ACQUIRED")
+        return True
+    except Exception:  # noqa: BLE001
+        logger.error("Could not acquire simulation advisory lock — worker will not start")
+        if _lock_conn is not None:
+            _lock_conn.close()
+            _lock_conn = None
+        return False
+
+
+def _release_advisory_lock() -> None:
+    global _lock_conn
+    if _lock_conn is None:
+        return
+    try:
+        _lock_conn.execute(text(f"SELECT pg_advisory_unlock({ADVISORY_LOCK_ID})"))
+        _lock_conn.commit()
+        logger.info("Simulation advisory lock released")
+    except Exception:  # noqa: BLE001
+        logger.warning("Failed to release simulation advisory lock", exc_info=True)
+    finally:
+        _lock_conn.close()
+        _lock_conn = None
+
+
+async def _loop() -> None:
+    global _last_clock_broadcast
+    if not _acquire_advisory_lock():
+        return
+
+    last_real = asyncio.get_event_loop().time()
+    logger.info("Simulation engine loop started")
+    try:
+        while not _stop.is_set():
+            await asyncio.sleep(0.5)
+            now_real = asyncio.get_event_loop().time()
+            delta = now_real - last_real
+            last_real = now_real
+
+            pending_broadcasts: list[tuple[str, dict[str, Any]]] = []
+            news_reactions: list[float] = []
+            ai_tick_elapsed: float | None = None
+            completed = False
+
+            try:
+                with SessionLocal() as db:
+                    state = get_or_create_state(db)
+                    if state.status != SimulationStatus.RUNNING:
+                        continue
+
+                    elapsed = advance_clock(db, delta)
+                    state = get_or_create_state(db)
+
+                    event_results = process_due_events(db, elapsed)
+                    for er in event_results:
+                        etype = er.get("type")
+                        logger.info(
+                            "Timeline event executed: type=%s headline=%s",
+                            etype,
+                            er.get("headline") or er.get("checkpoint_id"),
+                        )
+                        if etype == "NEWS":
+                            detail = er.get("broadcast")
+                            if detail:
+                                pending_broadcasts.append(("NEWS_RELEASED", detail))
+                            news_reactions.append(elapsed)
+                        elif etype == "IPO_OPEN":
+                            logger.info("IPO EVENT: open ticker=%s", er.get("ticker"))
+                            pending_broadcasts.append(("IPO_OPENED", er))
+                        elif etype == "IPO_ALLOTMENT":
+                            logger.info("IPO EVENT: allotment ipo_id=%s", er.get("ipo_id"))
+                            pending_broadcasts.append(("IPO_RESULT", er))
+                        elif etype == "IPO_LISTING":
+                            logger.info("IPO EVENT: listing ticker=%s", er.get("ticker"))
+                            pending_broadcasts.append(("IPO_LISTED", er))
+                        elif etype == "COMPANY_DISSOLUTION":
+                            logger.info("DISSOLUTION EVENT: %s", er)
+                            pending_broadcasts.append(("COMPANY_DISSOLVED", er))
+                        elif etype == "SIMULATION_END":
+                            pending_broadcasts.append(("SIMULATION_STATUS", status_dict(db)))
+
+                    settings = get_or_create_settings(db)
+                    state = get_or_create_state(db)
+                    if settings.simulation_ai_enabled:
+                        if elapsed - float(state.last_ai_tick_elapsed_sec) >= AI_TICK_INTERVAL_SEC:
+                            ai_tick_elapsed = elapsed
+
+                    if elapsed >= float(state.sim_duration_sec) and state.status == SimulationStatus.RUNNING:
+                        state.status = SimulationStatus.COMPLETED
+                        session_pause(db)
+                        db.commit()
+                        logger.info("Simulation completed at sim=%.0fs", elapsed)
+                        pending_broadcasts.append(("SIMULATION_STATUS", status_dict(db)))
+                        completed = True
+
+                    if not completed and elapsed - _last_clock_broadcast >= CLOCK_BROADCAST_INTERVAL:
+                        _last_clock_broadcast = elapsed
+                        pending_broadcasts.append(("SIMULATION_CLOCK", status_dict(db)))
+
+            except Exception:  # noqa: BLE001
+                logger.exception("Simulation engine tick failed")
+                continue
+
+            await _broadcast_messages(pending_broadcasts)
+            for reaction_elapsed in news_reactions:
+                await _immediate_news_reaction(reaction_elapsed)
+            if ai_tick_elapsed is not None:
+                await _maybe_run_ai_tick(ai_tick_elapsed)
+    finally:
+        _release_advisory_lock()
+        logger.info("Simulation engine loop stopped")
+
+
+def session_pause(db) -> None:
+    from app.models import MarketSession
+    from app.models.enums import MarketSessionStatus
+
+    session = db.scalar(select(MarketSession).order_by(MarketSession.id.desc()).limit(1))
+    if session:
+        session.status = MarketSessionStatus.CLOSED
+
+
+def start_engine() -> None:
+    global _task
+    if _task and not _task.done():
+        return
+    _stop.clear()
+    _task = asyncio.create_task(_loop())
+    logger.info("Simulation engine task scheduled")
+
+
+def stop_engine() -> None:
+    global _task
+    _stop.set()
+    if _task:
+        _task.cancel()
+        _task = None
+    logger.info("Simulation engine stop requested")
+
+
+def engine_status() -> dict[str, Any]:
+    return {"running": _task is not None and not _task.done()}

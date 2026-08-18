@@ -15,6 +15,14 @@ from app.exchange.book_registry import books
 from app.main import create_app
 
 
+def join_participant(client: TestClient, display_name: str = "Tester") -> tuple[int, dict[str, str]]:
+    res = client.post("/api/v1/auth/join", json={"display_name": display_name})
+    assert res.status_code == 200, res.text
+    data = res.json()
+    headers = {"Authorization": f"Bearer {data['access_token']}"}
+    return data["trader_id"], headers
+
+
 def _make_memory_engine():
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -41,6 +49,12 @@ def db_session() -> Session:
     Base.metadata.create_all(bind=engine)
     session = TestingSession()
     try:
+        from app.models.enums import SimulationStatus
+        from app.services.simulation_clock import get_or_create_state
+
+        state = get_or_create_state(session)
+        state.status = SimulationStatus.RUNNING
+        session.commit()
         yield session
     finally:
         session.close()
@@ -59,6 +73,7 @@ def client() -> TestClient:
     Base.metadata.create_all(bind=engine)
 
     app = create_app()
+    settings = get_settings()
 
     def _override_db():
         db = TestingSession()
@@ -68,7 +83,16 @@ def client() -> TestClient:
             db.close()
 
     app.dependency_overrides[get_db] = _override_db
-    with TestClient(app) as test_client:
+    headers = {"Authorization": f"Bearer {settings.admin_secret}"}
+    with TestClient(app, headers=headers) as test_client:
+        db = TestingSession()
+        from app.models.enums import SimulationStatus
+        from app.services.simulation_clock import get_or_create_state
+
+        state = get_or_create_state(db)
+        state.status = SimulationStatus.RUNNING
+        db.commit()
+        db.close()
         yield test_client
     app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=engine)

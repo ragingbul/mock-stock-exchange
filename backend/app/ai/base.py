@@ -19,6 +19,8 @@ class MarketView:
     recent_return: float  # short-term %
     news_impact: float
     signal: float
+    remaining_impact_pct: float = 0.0
+    target_reached: bool = True
 
 
 @dataclass

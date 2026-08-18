@@ -56,6 +56,11 @@ Desktop.ini
 # Docker / local data
 postgres_data/
 *.sqlite3
+backups/*.sql
+nginx/certs/*.pem
+nginx/certs/*.key
+!nginx/certs/.gitkeep
+!backups/.gitkeep
 
 # Misc
 *.bak

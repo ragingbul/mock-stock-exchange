@@ -51,7 +51,19 @@ def settle_fill(db: Session, stock_id: int, fill: MatchFill) -> Trade:
     if not all([buyer, seller, stock, buy_order, sell_order]):
         raise SettlementError("missing entities for settlement")
 
-    notional = fill.price * fill.quantity
+    from app.services.simulation_settings_service import get_or_create_settings
+
+    settings = get_or_create_settings(db)
+    prev_ltp = Decimal(stock.last_traded_price or stock.starting_price)
+    exec_price = fill.price
+    max_move = Decimal(str(settings.max_price_move_per_tick_pct)) / Decimal("100")
+    if prev_ltp > 0 and max_move > 0:
+        upper = prev_ltp * (Decimal("1") + max_move)
+        lower = prev_ltp * (Decimal("1") - max_move)
+        exec_price = max(lower, min(upper, exec_price))
+    exec_price = max(Decimal("1"), min(Decimal("10000"), exec_price))
+    notional = exec_price * fill.quantity
+
     if buyer.cash < notional:
         raise SettlementError("buyer has insufficient cash at settlement")
 
@@ -92,9 +104,6 @@ def settle_fill(db: Session, stock_id: int, fill: MatchFill) -> Trade:
         else:
             order.status = OrderStatus.PARTIALLY_FILLED
 
-    # Market data: LTP from execution only
-    stock.last_traded_price = fill.price
-
     trade = Trade(
         stock_id=stock_id,
         buy_order_id=fill.buy_order_id,
@@ -102,8 +111,9 @@ def settle_fill(db: Session, stock_id: int, fill: MatchFill) -> Trade:
         buyer_id=fill.buyer_id,
         seller_id=fill.seller_id,
         quantity=fill.quantity,
-        price=fill.price,
+        price=exec_price,
     )
     db.add(trade)
     db.flush()
+    stock.last_traded_price = exec_price
     return trade

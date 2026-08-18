@@ -45,6 +45,7 @@ def create_trader(db: Session, payload: TraderCreate) -> Trader:
         trader_type=payload.trader_type,
         starting_capital=capital,
         cash=capital,
+        cash_blocked_ipo=Decimal("0.00"),
         realized_pnl=Decimal("0.00"),
         user_id=user.id if user else None,
     )

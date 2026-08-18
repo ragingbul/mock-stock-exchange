@@ -75,6 +75,9 @@ class PortfolioRead(BaseModel):
     trader_id: int
     name: str
     cash: Decimal
+    cash_blocked_ipo: Decimal = Decimal("0")
+    available_cash: Decimal
+    invested: Decimal
     starting_capital: Decimal
     holdings_value: Decimal
     portfolio_value: Decimal
@@ -85,10 +88,22 @@ class PortfolioRead(BaseModel):
     holdings: list[HoldingRead]
 
 
+class WalletRead(BaseModel):
+    trader_id: int
+    available_cash: Decimal
+    cash_blocked_ipo: Decimal
+    invested: Decimal
+    portfolio_value: Decimal
+    total_pnl: Decimal
+    return_pct: Decimal
+    starting_capital: Decimal
+
+
 class StockCreate(BaseModel):
     ticker: str = Field(min_length=1, max_length=16)
     company_name: str
     sector: Sector
+    sector_id: int | None = None
     starting_price: Decimal = Field(gt=0)
     shares_outstanding: int = Field(gt=0)
     fair_value: Decimal = Field(gt=0)
@@ -106,6 +121,9 @@ class StockRead(BaseModel):
     ticker: str
     company_name: str
     sector: Sector
+    sector_id: int | None = None
+    sector_slug: str | None = None
+    sector_name: str | None = None
     starting_price: Decimal
     last_traded_price: Decimal
     previous_close: Decimal
@@ -119,6 +137,22 @@ class StockRead(BaseModel):
     is_halted: bool
     description: str | None = None
     percent_change: Decimal | None = None
+
+
+class SectorRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    slug: str
+    name: str
+    display_order: int
+    is_active: bool
+    stock_count: int | None = None
+
+
+class SectorAssign(BaseModel):
+    sector_id: int | None = None
+    sector_slug: str | None = None
 
 
 class HoldingAdjust(BaseModel):

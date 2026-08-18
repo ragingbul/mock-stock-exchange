@@ -14,12 +14,73 @@ from app.models.enums import MarketSessionStatus, TraderType
 from app.models.order_enums import OrderStatus
 from app.models import Order, Trade, Trader
 from app.realtime.ws_manager import manager
-from app.schemas.orders import HaltRequest, NewsCreate, NewsRead
-from app.services import news_service, order_service, stock_service, session_service
-from app.services.liquidity_service import seed_all_liquidity, seed_liquidity_if_needed
+from app.schemas.orders import HaltRequest, NewsCreate, NewsRead, SessionUpdate
+from app.schemas import SectorAssign
+from app.services import news_service, order_service, sector_service, stock_service
+from app.services.liquidity_service import seed_all_liquidity
 from app.services.news_service import effective_impact
+from app.services.sector_service import SectorServiceError
+from app.api.routes.stocks import _to_stock_read
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+@router.post("/simulation/start")
+async def simulation_start(db: Session = Depends(get_db)) -> dict:
+    from app.services.simulation_controller import SimulationControlError, start_simulation
+
+    try:
+        result = start_simulation(db)
+    except SimulationControlError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await manager.broadcast("SIMULATION_STATUS", result)
+    return result
+
+
+@router.post("/simulation/stop")
+async def simulation_stop(db: Session = Depends(get_db)) -> dict:
+    from app.services.simulation_controller import SimulationControlError, stop_simulation
+
+    try:
+        result = stop_simulation(db)
+    except SimulationControlError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await manager.broadcast("SIMULATION_STATUS", result)
+    return result
+
+
+@router.post("/simulation/reset")
+async def simulation_reset(db: Session = Depends(get_db)) -> dict:
+    from app.services.simulation_controller import SimulationControlError, reset_simulation
+
+    try:
+        result = reset_simulation(db)
+    except SimulationControlError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    await manager.broadcast("SIMULATION_STATUS", result)
+    return result
+
+
+@router.get("/simulation/status")
+def simulation_status(
+    db: Session = Depends(get_db),
+    include_checkpoints: bool = True,
+) -> dict:
+    from app.services.simulation_clock import status_dict
+    from app.services.timeline_service import progress_snapshot
+
+    state = status_dict(db)
+    progress = progress_snapshot(db, state["elapsed_sec"], include_checkpoints=include_checkpoints)
+    return {**state, **progress}
+
+
+@router.get("/timeline/progress")
+def timeline_progress(db: Session = Depends(get_db)) -> dict:
+    from app.services.simulation_clock import get_or_create_state
+    from app.services.timeline_service import progress_snapshot
+
+    state = get_or_create_state(db)
+    return progress_snapshot(db, float(state.sim_elapsed_sec))
 
 
 def _market_status(db: Session) -> dict:
@@ -50,7 +111,12 @@ def _market_status(db: Session) -> dict:
 
 @router.post("/session/start")
 async def start_session(name: str = "Live Session", db: Session = Depends(get_db)) -> dict:
-    session = session_service.open_session(db, name)
+    session = MarketSession(
+        name=name,
+        status=MarketSessionStatus.OPEN,
+        started_at=datetime.now(timezone.utc),
+    )
+    db.add(session)
     db.commit()
     db.refresh(session)
     await manager.broadcast("MARKET_HALTED", {"halted": False, "status": "open"})
@@ -59,7 +125,9 @@ async def start_session(name: str = "Live Session", db: Session = Depends(get_db
 
 @router.post("/session/pause")
 async def pause_session(db: Session = Depends(get_db)) -> dict:
-    session = session_service.get_active_session(db)
+    from sqlalchemy import select
+
+    session = db.scalar(select(MarketSession).order_by(MarketSession.id.desc()).limit(1))
     if not session:
         raise HTTPException(404, "no session")
     session.status = MarketSessionStatus.PAUSED
@@ -70,7 +138,9 @@ async def pause_session(db: Session = Depends(get_db)) -> dict:
 
 @router.post("/session/resume")
 async def resume_session(db: Session = Depends(get_db)) -> dict:
-    session = session_service.get_active_session(db)
+    from sqlalchemy import select
+
+    session = db.scalar(select(MarketSession).order_by(MarketSession.id.desc()).limit(1))
     if not session:
         raise HTTPException(404, "no session")
     session.status = MarketSessionStatus.OPEN
@@ -99,7 +169,8 @@ async def halt(payload: HaltRequest, db: Session = Depends(get_db)) -> dict:
 
 @router.post("/news", response_model=NewsRead)
 def create_news(payload: NewsCreate, db: Session = Depends(get_db)) -> NewsRead:
-    event = news_service.create_news(db, **payload.model_dump())
+    data = payload.model_dump()
+    event = news_service.create_news(db, **data)
     return NewsRead.model_validate(event)
 
 
@@ -109,22 +180,66 @@ async def release_news(event_id: int, db: Session = Depends(get_db)) -> NewsRead
         event = news_service.release_news(db, event_id)
     except ValueError as exc:
         raise HTTPException(404, str(exc)) from exc
+    detail = news_service.news_detail_dict(event)
     read = NewsRead.model_validate(event)
     read = read.model_copy(update={"effective_impact": effective_impact(event)})
-    await manager.broadcast(
-        "NEWS_RELEASED",
-        read.model_dump(mode="json"),
-    )
+    await manager.broadcast("NEWS_RELEASED", detail)
     return read
+
+
+@router.post("/news/{event_id}/cancel")
+def cancel_news(event_id: int, db: Session = Depends(get_db)) -> dict:
+    try:
+        event = news_service.cancel_news(db, event_id)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"id": event.id, "status": event.status}
 
 
 @router.get("/news", response_model=list[NewsRead])
 def list_news(db: Session = Depends(get_db)) -> list[NewsRead]:
     out = []
-    for event in news_service.list_news(db):
+    for event in news_service.list_news(db, include_scheduled=True):
         read = NewsRead.model_validate(event)
         out.append(read.model_copy(update={"effective_impact": effective_impact(event)}))
     return out
+
+
+@router.get("/simulation-settings")
+def get_sim_settings(db: Session = Depends(get_db)) -> dict:
+    from app.services.simulation_settings_service import get_or_create_settings, settings_dict
+
+    return settings_dict(get_or_create_settings(db))
+
+
+@router.patch("/simulation-settings")
+def patch_sim_settings(payload: dict, db: Session = Depends(get_db)) -> dict:
+    from app.services.simulation_settings_service import settings_dict, update_settings
+    from app.schemas.orders import SimulationSettingsUpdate
+
+    parsed = SimulationSettingsUpdate.model_validate(payload)
+    row = update_settings(db, **parsed.model_dump(exclude_unset=True))
+    return settings_dict(row)
+
+
+@router.post("/ai/scheduler/start")
+def start_ai_scheduler(db: Session = Depends(get_db)) -> dict:
+    from app.services import ai_scheduler
+    from app.services.simulation_settings_service import update_settings
+
+    update_settings(db, ai_scheduler_enabled=True)
+    ai_scheduler.start_scheduler()
+    return {"ok": True, **ai_scheduler.scheduler_status()}
+
+
+@router.post("/ai/scheduler/stop")
+def stop_ai_scheduler(db: Session = Depends(get_db)) -> dict:
+    from app.services import ai_scheduler
+    from app.services.simulation_settings_service import update_settings
+
+    update_settings(db, ai_scheduler_enabled=False)
+    ai_scheduler.stop_scheduler()
+    return {"ok": True, **ai_scheduler.scheduler_status()}
 
 
 @router.get("/overview")
@@ -171,33 +286,46 @@ def ai_tick(db: Session = Depends(get_db)) -> dict:
 
 
 @router.post("/bootstrap")
-async def bootstrap(db: Session = Depends(get_db)) -> dict:
-    from app.seed.stocks import seed_default_stocks
+def bootstrap(db: Session = Depends(get_db)) -> dict:
+    from app.services.simulation_controller import bootstrap_universe
 
-    stocks_created = seed_default_stocks(db)
-    agents_created = ai_runner.seed_default_agents(db)
-    has_stocks = len(stock_service.list_stocks(db)) > 0
-    already_bootstrapped = (
-        has_stocks and stocks_created == 0 and agents_created == 0
+    session = MarketSession(
+        name="Bootstrapped Session",
+        status=MarketSessionStatus.OPEN,
+        started_at=datetime.now(timezone.utc),
     )
+    db.add(session)
+    db.flush()
 
-    if already_bootstrapped:
-        session, reused = session_service.ensure_open_session(db, "Bootstrapped Session")
-        liquidity_quotes = seed_liquidity_if_needed(db)
-    else:
-        session = session_service.open_session(db, "Bootstrapped Session")
-        liquidity_quotes = seed_all_liquidity(db)
-        reused = False
-
-    db.commit()
+    result = bootstrap_universe(db)
     db.refresh(session)
-    payload = {
-        "stocks_created": stocks_created,
-        "agents_created": agents_created,
-        "liquidity_quotes": liquidity_quotes,
+    return {
+        **result,
         "session_id": session.id,
-        "already_bootstrapped": already_bootstrapped,
-        "session_reused": reused,
     }
-    await manager.broadcast("MARKET_HALTED", {"halted": False, "status": "open"})
-    return payload
+
+
+@router.patch("/stocks/{stock_id}/sector")
+def admin_assign_sector(
+    stock_id: int,
+    payload: SectorAssign,
+    db: Session = Depends(get_db),
+) -> dict:
+    try:
+        stock = sector_service.assign_stock_sector(
+            db,
+            stock_id,
+            sector_id=payload.sector_id,
+            sector_slug=payload.sector_slug,
+        )
+    except SectorServiceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    stock = stock_service.get_stock(db, stock.id) or stock
+    return {"stock": _to_stock_read(stock).model_dump(mode="json")}
+
+
+@router.post("/sectors/seed")
+def admin_seed_sectors(db: Session = Depends(get_db)) -> dict:
+    created = sector_service.seed_default_sectors(db)
+    linked = sector_service.backfill_stock_sectors(db)
+    return {"sectors_created": created, "stocks_linked": linked}

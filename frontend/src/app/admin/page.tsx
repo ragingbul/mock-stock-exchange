@@ -1,335 +1,248 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Leaderboard, type LeaderboardRow } from "@/components/Leaderboard";
-import { apiGet, apiPost, apiUrl, getApiBaseUrl } from "@/lib/api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { NewsPanel, type NewsItem } from "@/components/NewsPanel";
+import { useMarketWebSocket } from "@/hooks/useMarketWebSocket";
+import { adminGet, adminLogin, adminPost } from "@/lib/api";
 
-type MarketStatus = {
-  server_time_utc?: string;
-  session_status?: string;
-  market_online?: boolean;
-  stocks_halted?: number;
-  stocks_total?: number;
-  ai_agents?: number;
-  ai_agents_enabled?: number;
+type SimStatus = {
+  status: string;
+  elapsed: string;
+  duration: string;
+  elapsed_sec: number;
+  current_phase: string;
+  current_event?: { headline: string; checkpoint_id?: number } | null;
+  next_event?: { headline: string } | null;
+  seconds_to_next_event?: number | null;
+  completed_checkpoint_count: number;
+  total_checkpoint_count: number;
+  checkpoints?: Array<{
+    checkpoint_id: number;
+    headline: string;
+    status: string;
+    timestamp: string;
+    type: string;
+  }>;
 };
 
-type AdminAction = {
-  label: string;
-  run: () => Promise<unknown>;
-  confirm?: string;
-  variant?: "danger" | "default";
-};
+function fmtCountdown(sec: number | null | undefined) {
+  if (sec == null) return "—";
+  const s = Math.max(0, Math.floor(sec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
+}
 
-const BTN_BASE =
-  "border px-3 py-4 text-left font-mono text-sm transition-all duration-150 touch-manipulation active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50";
+function mergeStatus(prev: SimStatus | null, next: Partial<SimStatus>): SimStatus {
+  const checkpoints =
+    next.checkpoints && next.checkpoints.length > 0
+      ? next.checkpoints
+      : prev?.checkpoints ?? [];
+  return { ...(prev ?? (next as SimStatus)), ...next, checkpoints };
+}
 
 export default function AdminPage() {
-  const [overview, setOverview] = useState<Record<string, unknown> | null>(null);
-  const [marketStatus, setMarketStatus] = useState<MarketStatus | null>(null);
-  const [clock, setClock] = useState("");
+  const [status, setStatus] = useState<SimStatus | null>(null);
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [msg, setMsg] = useState("");
-  const [activeAction, setActiveAction] = useState<string | null>(null);
-  const [apiOk, setApiOk] = useState<boolean | null>(null);
-  const [newsTitle, setNewsTitle] = useState("TechNova wins contract");
-  const [newsBody, setNewsBody] = useState("Government awards ₹500cr deal.");
-  const [tickers, setTickers] = useState("TECHNOVA");
-  const [direction, setDirection] = useState(1);
-  const [impact, setImpact] = useState("0.75");
-  const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
-  const [leaderboardLoading, setLeaderboardLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
 
-  const refreshOverview = useCallback(async (silent = false) => {
-    try {
-      await apiGet("/health");
-      setApiOk(true);
-      const [ov, lb] = await Promise.all([
-        apiGet<Record<string, unknown>>("/admin/overview"),
-        apiGet<LeaderboardRow[]>("/leaderboard"),
-      ]);
-      setOverview(ov);
-      setMarketStatus(ov as MarketStatus);
-      setLeaderboard(lb);
-      setLeaderboardLoading(false);
-      if (!silent) setMsg("");
-    } catch (e) {
-      setApiOk(false);
-      setOverview(null);
-      setMarketStatus(null);
-      setLeaderboardLoading(false);
-      if (!silent) {
-        setMsg(e instanceof Error ? e.message : "Cannot reach API");
-      }
+  const [adminToken, setAdminToken] = useState<string | null>(null);
+  const [secret, setSecret] = useState("");
+  const statusInflight = useRef(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setAdminToken(window.localStorage.getItem("mse_admin_token"));
     }
   }, []);
 
-  useEffect(() => {
-    refreshOverview(true);
-    const poll = window.setInterval(() => refreshOverview(true), 5000);
-    return () => window.clearInterval(poll);
-  }, [refreshOverview]);
+  const refreshStatus = useCallback(
+    async (opts?: { includeCheckpoints?: boolean; quiet?: boolean }) => {
+      if (!adminToken || statusInflight.current) return;
+      statusInflight.current = true;
+      try {
+        const data = await adminGet<SimStatus>("/admin/simulation/status", {
+          include_checkpoints: opts?.includeCheckpoints ?? false,
+        });
+        setStatus((prev) => mergeStatus(prev, data));
+        if (!opts?.quiet) setMsg("");
+      } catch (e) {
+        if (!opts?.quiet) {
+          setMsg(e instanceof Error ? e.message : "Failed to load status");
+        }
+      } finally {
+        statusInflight.current = false;
+      }
+    },
+    [adminToken],
+  );
 
-  useEffect(() => {
-    const tick = () => setClock(new Date().toLocaleString());
-    tick();
-    const id = window.setInterval(tick, 1000);
-    return () => window.clearInterval(id);
-  }, []);
-
-  async function runAction(label: string, fn: () => Promise<unknown>, confirm?: string) {
-    if (confirm && !window.confirm(confirm)) return;
-
-    setActiveAction(label);
-    setMsg(`Running: ${label}…`);
+  const refreshNews = useCallback(async () => {
+    if (!adminToken) return;
     try {
-      const result = await fn();
-      setMsg(`${label}: ${JSON.stringify(result)}`);
-      await refreshOverview(true);
+      const data = await adminGet<NewsItem[]>("/admin/news");
+      setNews(data);
+    } catch {
+      /* non-fatal */
+    }
+  }, [adminToken]);
+
+  useEffect(() => {
+    if (!adminToken) return;
+    refreshStatus({ includeCheckpoints: true });
+    refreshNews();
+    const id = setInterval(() => {
+      refreshStatus({ includeCheckpoints: false, quiet: true });
+    }, 8000);
+    return () => clearInterval(id);
+  }, [refreshStatus, refreshNews, adminToken]);
+
+  useMarketWebSocket({
+    onMessage: (msg) => {
+      if (msg.event === "NEWS_RELEASED") {
+        refreshNews();
+      }
+      if (msg.event === "SIMULATION_CLOCK" || msg.event === "SIMULATION_STATUS") {
+        const payload = (msg.payload ?? msg) as Partial<SimStatus>;
+        setStatus((prev) => mergeStatus(prev, payload));
+      }
+    },
+  });
+
+  async function act(action: "start" | "stop" | "reset") {
+    if (!adminToken) return;
+    setBusy(true);
+    setMsg("");
+    try {
+      await adminPost(`/admin/simulation/${action}`);
+      setMsg(`${action.toUpperCase()} OK`);
+      await refreshStatus({ includeCheckpoints: true });
+      if (action === "reset") {
+        setNews([]);
+        setSelectedNews(null);
+        await refreshNews();
+      }
     } catch (e) {
-      setMsg(`${label} failed: ${e instanceof Error ? e.message : "error"}`);
+      setMsg(e instanceof Error ? e.message : `${action} failed`);
     } finally {
-      setActiveAction(null);
+      setBusy(false);
     }
   }
 
-  const actions: AdminAction[] = [
-    {
-      label: "Bootstrap market",
-      confirm: "Bootstrap the market (seed stocks, AI agents, and open a session)?",
-      run: () => apiPost("/admin/bootstrap"),
-    },
-    {
-      label: "Start session",
-      run: () => apiPost("/admin/session/start"),
-    },
-    {
-      label: "Pause",
-      confirm: "Pause the market? New orders will be rejected until resumed.",
-      variant: "danger",
-      run: () => apiPost("/admin/session/pause"),
-    },
-    {
-      label: "Resume",
-      run: () => apiPost("/admin/session/resume"),
-    },
-    {
-      label: "Seed AI agents",
-      run: () => apiPost("/admin/ai/seed"),
-    },
-    {
-      label: "Run AI tick",
-      run: () => apiPost("/admin/ai/tick"),
-    },
-    {
-      label: "Halt all",
-      confirm: "Halt all stocks? Trading will stop on every ticker.",
-      variant: "danger",
-      run: () => apiPost("/admin/halt", { market_wide: true, halted: true }),
-    },
-    {
-      label: "Clear halt",
-      run: () => apiPost("/admin/halt", { market_wide: true, halted: false }),
-    },
-  ];
+  const cp = status?.checkpoints ?? [];
+  const currentId = status?.current_event?.checkpoint_id;
 
-  const marketOnline = marketStatus?.market_online === true;
-  const sessionStatus = marketStatus?.session_status ?? "unknown";
-  const showMarketAlert = apiOk === false || !marketOnline || sessionStatus === "paused";
-  const isBusy = activeAction !== null;
+  if (!adminToken) {
+    return (
+      <main className="min-h-screen bg-black text-white p-8 max-w-md mx-auto font-mono flex flex-col justify-center gap-4">
+        <h1 className="text-2xl font-bold tracking-widest text-center">TRADEVERSE ADMIN</h1>
+        <input
+          type="password"
+          placeholder="Admin secret"
+          value={secret}
+          onChange={(e) => setSecret(e.target.value)}
+          className="bg-neutral-900 border border-neutral-700 rounded px-3 py-2"
+        />
+        <button
+          className="px-4 py-2 bg-green-700 rounded"
+          onClick={async () => {
+            try {
+              const res = await adminLogin(secret);
+              setAdminToken(res.access_token);
+              setMsg("Authenticated");
+            } catch (e) {
+              setMsg(e instanceof Error ? e.message : "Login failed");
+            }
+          }}
+        >
+          Login
+        </button>
+        {msg && <p className="text-sm text-yellow-300 text-center">{msg}</p>}
+      </main>
+    );
+  }
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-4 py-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="font-mono text-xs uppercase tracking-[0.18em] text-accent">
-            Exchange Control
-          </p>
-          <h1 className="text-3xl font-semibold">Admin / NSE Panel</h1>
-          <p className="mt-2 font-mono text-xs text-muted">
-            API: {apiUrl("/health")} ·{" "}
-            {apiOk === null ? "checking…" : apiOk ? "connected" : "disconnected"}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={isBusy}
-            className="border border-line bg-panel px-3 py-2 font-mono text-xs hover:border-accent disabled:opacity-50"
-            onClick={() => refreshOverview()}
-          >
-            Refresh status
-          </button>
-          <a href="/terminal" className="font-mono text-sm text-accent underline">
-            Trading terminal
-          </a>
-        </div>
+    <main className="min-h-screen bg-black text-white p-8 max-w-2xl mx-auto font-mono">
+      <h1 className="text-2xl font-bold tracking-widest mb-8 text-center">TRADEVERSE ADMIN</h1>
+
+      <div className="flex gap-4 justify-center mb-8">
+        <button
+          disabled={busy}
+          onClick={() => act("start")}
+          className="px-8 py-3 bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded"
+        >
+          ▶ START
+        </button>
+        <button
+          disabled={busy}
+          onClick={() => act("stop")}
+          className="px-8 py-3 bg-yellow-700 hover:bg-yellow-600 disabled:opacity-50 rounded"
+        >
+          ⏸ STOP
+        </button>
+        <button
+          disabled={busy}
+          onClick={() => act("reset")}
+          className="px-8 py-3 bg-red-800 hover:bg-red-700 disabled:opacity-50 rounded"
+        >
+          ↻ RESET
+        </button>
       </div>
 
-      <section className="mt-6 grid gap-3 border border-line bg-panel p-4 sm:grid-cols-3">
-        <div>
-          <p className="font-mono text-xs uppercase text-muted">Exchange clock</p>
-          <p className="mt-1 font-mono text-lg">{clock}</p>
-        </div>
-        <div>
-          <p className="font-mono text-xs uppercase text-muted">Market status</p>
-          <p className={`mt-1 font-mono text-lg ${marketOnline ? "text-accent" : "text-warn"}`}>
-            {apiOk === false ? "OFFLINE (API)" : marketOnline ? "ONLINE" : `NOT TRADING (${sessionStatus})`}
-          </p>
-          <p className="font-mono text-xs text-muted">
-            Session: {sessionStatus} · AI bots: {marketStatus?.ai_agents_enabled ?? "—"}/
-            {marketStatus?.ai_agents ?? "—"}
-          </p>
-        </div>
-        <div>
-          <p className="font-mono text-xs uppercase text-muted">Stocks</p>
-          <p className="mt-1 font-mono text-lg">
-            {marketStatus?.stocks_total ?? "—"} total · {marketStatus?.stocks_halted ?? "—"} halted
-          </p>
-        </div>
-      </section>
+      {msg && <p className="text-center text-sm text-yellow-300 mb-4">{msg}</p>}
 
-      {showMarketAlert && (
-        <div className="mt-4 border border-warn bg-panel p-3 text-sm text-warn">
-          {apiOk === false ? (
-            <>
-              Cannot reach backend at <strong>{getApiBaseUrl()}</strong>. Use Refresh status after
-              starting the API.
-            </>
-          ) : sessionStatus === "paused" ? (
-            <>
-              Market session is <strong>paused</strong>. Resume or start a session — orders will be
-              rejected.
-            </>
-          ) : (
-            <>
-              Market is <strong>not online</strong>. Bootstrap market or start a session, and clear
-              halt if needed.
-            </>
-          )}
-        </div>
+      {status && (
+        <section className="border border-neutral-700 rounded p-4 space-y-3 mb-6">
+          <p className="text-xl text-center">
+            {status.elapsed} / {status.duration}
+          </p>
+          <p className="text-center text-neutral-300">{status.current_phase}</p>
+          <p>
+            <span className="text-neutral-500">CURRENT: </span>
+            {status.current_event?.headline ?? "—"}
+          </p>
+          <p>
+            <span className="text-neutral-500">NEXT: </span>
+            {status.next_event?.headline ?? "—"}
+          </p>
+          <p>
+            <span className="text-neutral-500">IN: </span>
+            {fmtCountdown(status.seconds_to_next_event)}
+          </p>
+          <p className="text-sm text-neutral-400">
+            Checkpoints {status.completed_checkpoint_count}/{status.total_checkpoint_count} · Status:{" "}
+            {status.status}
+          </p>
+        </section>
       )}
 
-      {apiOk === false && (
-        <div className="mt-4 border border-warn bg-panel p-3 text-sm text-warn">
-          Start the API with:
-          <code className="ml-1 block mt-1 font-mono text-xs">
-            cd backend &amp;&amp; uvicorn app.main:app --host 0.0.0.0 --port 8000
-          </code>
-        </div>
-      )}
-
-      {msg && (
-        <div className="mt-4 border border-line bg-panel p-3 font-mono text-xs text-accent">
-          {msg}
-        </div>
-      )}
-
-      <section className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {actions.map(({ label, run, confirm, variant }) => {
-          const loading = activeAction === label;
-          const disabled = isBusy || apiOk === false;
-          return (
-            <button
-              key={label}
-              type="button"
-              disabled={disabled}
-              className={`${BTN_BASE} ${
-                variant === "danger"
-                  ? "border-warn/60 bg-panel hover:border-warn"
-                  : "border-line bg-panel hover:border-accent"
-              } ${loading ? "border-accent ring-1 ring-accent/40" : ""}`}
-              onClick={() => runAction(label, run, confirm)}
-            >
-              {loading ? `Running ${label}…` : label}
-            </button>
-          );
-        })}
+      <section className="border border-neutral-700 rounded p-4 max-h-96 overflow-y-auto mb-6">
+        <h2 className="text-sm text-neutral-500 mb-3">CHECKPOINTS (read-only)</h2>
+        <ul className="space-y-1 text-sm">
+          {cp.map((c) => {
+            const mark =
+              c.status === "executed"
+                ? currentId === c.checkpoint_id
+                  ? "●"
+                  : "✓"
+                : "○";
+            return (
+              <li key={c.checkpoint_id} className={c.status === "executed" ? "text-green-400" : "text-neutral-500"}>
+                {mark} {c.timestamp} {c.headline}
+              </li>
+            );
+          })}
+        </ul>
       </section>
 
-      <section className="mt-8 border border-line bg-panel p-4">
-        <h2 className="font-mono text-sm uppercase text-muted">Release news</h2>
-        <div className="mt-3 grid gap-2 md:grid-cols-2">
-          <input
-            className="border border-line bg-background px-2 py-2"
-            value={newsTitle}
-            onChange={(e) => setNewsTitle(e.target.value)}
-            placeholder="Title"
-          />
-          <input
-            className="border border-line bg-background px-2 py-2"
-            value={tickers}
-            onChange={(e) => setTickers(e.target.value)}
-            placeholder="Tickers"
-          />
-          <textarea
-            className="border border-line bg-background px-2 py-2 md:col-span-2"
-            value={newsBody}
-            onChange={(e) => setNewsBody(e.target.value)}
-          />
-          <input
-            type="number"
-            className="border border-line bg-background px-2 py-2"
-            value={direction}
-            onChange={(e) => setDirection(Number(e.target.value))}
-            placeholder="direction -1/0/1"
-          />
-          <input
-            className="border border-line bg-background px-2 py-2"
-            value={impact}
-            onChange={(e) => setImpact(e.target.value)}
-            placeholder="impact 0-1"
-          />
-        </div>
-        <button
-          type="button"
-          disabled={isBusy || apiOk === false}
-          className={`mt-3 bg-accent px-4 py-3 font-mono text-sm text-black transition active:scale-[0.98] disabled:opacity-50 ${activeAction === "News" ? "opacity-70" : ""}`}
-          onClick={() =>
-            runAction(
-              "News",
-              async () => {
-                const created = await apiPost<{ id: number }>("/admin/news", {
-                  title: newsTitle,
-                  description: newsBody,
-                  affected_tickers: tickers,
-                  direction,
-                  impact,
-                  confidence: 0.9,
-                  duration_minutes: 20,
-                  decay_rate: 0.05,
-                  fundamental_impact_pct: direction * Number(impact) * 8,
-                });
-                return apiPost(`/admin/news/${created.id}/release`);
-              },
-              `Release news "${newsTitle}" for ${tickers}?`,
-            )
-          }
-        >
-          {activeAction === "News" ? "Releasing news…" : "Create & release"}
-        </button>
-      </section>
+      <NewsPanel news={news} selectedNews={selectedNews} onSelectNews={setSelectedNews} />
 
-      <section className="mt-8 border border-line bg-panel p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-mono text-sm uppercase text-muted">Leaderboard</h2>
-          <p className="font-mono text-xs text-muted">
-            {leaderboard.length} human traders · ranked by return %
-          </p>
-        </div>
-        <Leaderboard
-          rows={leaderboard}
-          variant="admin"
-          loading={leaderboardLoading}
-          maxRows={20}
-        />
-      </section>
-
-      <section className="mt-8 border border-line bg-panel p-4">
-        <h2 className="font-mono text-sm uppercase text-muted">Overview</h2>
-        <pre className="mt-3 overflow-auto font-mono text-xs text-muted">
-          {overview ? JSON.stringify(overview, null, 2) : "Loading…"}
-        </pre>
-      </section>
+      <p className="text-center text-xs text-neutral-600 mt-8">
+        Simulation runs on the server. Closing this tab does not stop the movie.
+      </p>
     </main>
   );
 }

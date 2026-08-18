@@ -38,6 +38,15 @@ class NewsEvent(Base):
     fundamental_impact_pct: Mapped[Decimal | None] = mapped_column(
         Numeric(8, 4), nullable=True
     )
+    # Layer 6: JSON maps of sector_slug/ticker -> impact % (e.g. {"financials": -8})
+    market_wide_impact_pct: Mapped[Decimal | None] = mapped_column(
+        Numeric(8, 4), nullable=True
+    )
+    sector_impacts_json: Mapped[str] = mapped_column(Text, default="{}")
+    stock_impacts_json: Mapped[str] = mapped_column(Text, default="{}")
+    status: Mapped[str] = mapped_column(String(32), default="draft")  # draft/scheduled/released/cancelled
+    # Baseline LTP snapshot at release for target-impact tracking (JSON ticker->price)
+    baseline_prices_json: Mapped[str] = mapped_column(Text, default="{}")
     scheduled_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

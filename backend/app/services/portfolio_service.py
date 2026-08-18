@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import Holding, Stock, Trader
-from app.schemas import HoldingAdjust, HoldingRead, PortfolioRead
+from app.schemas import HoldingAdjust, HoldingRead, PortfolioRead, WalletRead
 from app.services.trader_service import TraderServiceError
 
 
@@ -32,7 +32,6 @@ def set_holding(db: Session, trader_id: int, payload: HoldingAdjust) -> Holding:
         if holding is not None:
             db.delete(holding)
             db.commit()
-            # Return a detached snapshot for API convenience
             holding = Holding(
                 trader_id=trader_id,
                 stock_id=payload.stock_id,
@@ -62,7 +61,7 @@ def set_holding(db: Session, trader_id: int, payload: HoldingAdjust) -> Holding:
 
     db.commit()
     db.refresh(holding)
-    _ = holding.stock  # ensure relationship is available for API responses
+    _ = holding.stock
     return holding
 
 
@@ -101,11 +100,13 @@ def get_portfolio(db: Session, trader_id: int) -> PortfolioRead:
             )
         )
 
-    cash = Decimal(trader.cash)
+    available = Decimal(trader.cash)
+    blocked = Decimal(getattr(trader, "cash_blocked_ipo", 0) or 0)
     starting = Decimal(trader.starting_capital)
     realized = Decimal(trader.realized_pnl)
     unrealized_pnl = holdings_value - cost_basis
-    portfolio_value = cash + holdings_value
+    # Portfolio includes available cash + IPO-blocked cash + marked holdings
+    portfolio_value = available + blocked + holdings_value
     total_pnl = realized + unrealized_pnl
     return_pct = (
         ((portfolio_value - starting) / starting) * Decimal("100")
@@ -116,7 +117,10 @@ def get_portfolio(db: Session, trader_id: int) -> PortfolioRead:
     return PortfolioRead(
         trader_id=trader.id,
         name=trader.name,
-        cash=cash,
+        cash=available,
+        cash_blocked_ipo=blocked,
+        available_cash=available,
+        invested=holdings_value,
         starting_capital=starting,
         holdings_value=holdings_value,
         portfolio_value=portfolio_value,
@@ -125,4 +129,18 @@ def get_portfolio(db: Session, trader_id: int) -> PortfolioRead:
         total_pnl=total_pnl,
         return_pct=return_pct.quantize(Decimal("0.0001")),
         holdings=holdings_out,
+    )
+
+
+def get_wallet(db: Session, trader_id: int) -> WalletRead:
+    p = get_portfolio(db, trader_id)
+    return WalletRead(
+        trader_id=p.trader_id,
+        available_cash=p.available_cash,
+        cash_blocked_ipo=p.cash_blocked_ipo,
+        invested=p.invested,
+        portfolio_value=p.portfolio_value,
+        total_pnl=p.total_pnl,
+        return_pct=p.return_pct,
+        starting_capital=p.starting_capital,
     )

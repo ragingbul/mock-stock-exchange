@@ -1,0 +1,980 @@
+{
+  "version": 1,
+  "duration": "03:00:00",
+  "events": [
+    {
+      "checkpoint_id": 1,
+      "idempotency_key": "cp_01",
+      "time": "00:03",
+      "type": "NEWS",
+      "headline": "Strong economic growth continues",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Broad Market": 2,
+          "Financials": 2,
+          "Industrials": 2,
+          "Consumer": 2
+        }
+      }
+    },
+    {
+      "checkpoint_id": 2,
+      "idempotency_key": "cp_02",
+      "time": "00:06",
+      "type": "NEWS",
+      "headline": "Housing demand remains strong",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": 4,
+          "Real Estate": 5,
+          "Consumer": 2
+        }
+      }
+    },
+    {
+      "checkpoint_id": 3,
+      "idempotency_key": "cp_03",
+      "time": "00:09",
+      "type": "NEWS",
+      "headline": "Mortgage lenders report record business",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": 5,
+          "Real Estate": 3
+        }
+      }
+    },
+    {
+      "checkpoint_id": 4,
+      "idempotency_key": "cp_04",
+      "time": "00:12",
+      "type": "NEWS",
+      "headline": "Corporate earnings beat expectations",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Broad Market": 3,
+          "Consumer": 3,
+          "IT": 3,
+          "Industrials": 2
+        }
+      }
+    },
+    {
+      "checkpoint_id": 5,
+      "idempotency_key": "cp_05",
+      "time": "00:15",
+      "type": "NEWS",
+      "headline": "Consumer spending remains strong",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Consumer": 5,
+          "Automobiles": 4,
+          "Financials": 2
+        }
+      }
+    },
+    {
+      "checkpoint_id": 6,
+      "idempotency_key": "cp_06",
+      "time": "00:18",
+      "type": "NEWS",
+      "headline": "Investment banks post record revenues",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": 6
+        }
+      }
+    },
+    {
+      "checkpoint_id": 7,
+      "idempotency_key": "cp_07",
+      "time": "00:21",
+      "type": "NEWS",
+      "headline": "Credit remains widely available",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": 4,
+          "Real Estate": 4,
+          "Infrastructure": 2
+        }
+      }
+    },
+    {
+      "checkpoint_id": 8,
+      "idempotency_key": "cp_08",
+      "time": "00:24",
+      "type": "NEWS",
+      "headline": "Commodity prices rise on strong global demand",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Energy": 5,
+          "Metals": 5,
+          "Industrials": 3
+        }
+      }
+    },
+    {
+      "checkpoint_id": 9,
+      "idempotency_key": "cp_09",
+      "time": "00:27",
+      "type": "NEWS",
+      "headline": "IPO market attracts strong investor demand",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": 3,
+          "IT": 4
+        }
+      }
+    },
+    {
+      "checkpoint_id": 10,
+      "idempotency_key": "cp_10",
+      "time": "00:30",
+      "type": "IPO_OPEN",
+      "headline": "IPO #1 application opens",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_fch",
+        "company_name": "Future Capital",
+        "ticker": "FCH",
+        "issue_price": 765,
+        "lot_size": 18,
+        "total_lots": 800,
+        "winning_lots": 200,
+        "maximum_lots_per_user": 2,
+        "description": "Financial services IPO — issue price ₹765"
+      }
+    },
+    {
+      "checkpoint_id": 11,
+      "idempotency_key": "cp_11",
+      "time": "00:34",
+      "type": "NEWS",
+      "headline": "IPO receives overwhelming demand",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "IT": 5,
+          "Financials": 3,
+          "Broad Market": 2
+        }
+      }
+    },
+    {
+      "checkpoint_id": 12,
+      "idempotency_key": "cp_12",
+      "time": "00:36",
+      "type": "IPO_ALLOTMENT",
+      "headline": "FCH IPO allotment",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_fch"
+      }
+    },
+    {
+      "checkpoint_id": 13,
+      "idempotency_key": "cp_13_list",
+      "time": "00:37",
+      "type": "IPO_LISTING",
+      "headline": "FCH lists on exchange",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_fch"
+      }
+    },
+    {
+      "checkpoint_id": 13,
+      "idempotency_key": "cp_13b",
+      "time": "00:38",
+      "type": "IPO_OPEN",
+      "headline": "Reliance Power IPO application opens",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_rpower",
+        "company_name": "Reliance Power",
+        "ticker": "RPOWER",
+        "issue_price": 450,
+        "lot_size": 30,
+        "total_lots": 1000,
+        "winning_lots": 250,
+        "maximum_lots_per_user": 2,
+        "description": "Power / infrastructure IPO — issue price ₹450"
+      }
+    },
+    {
+      "checkpoint_id": 13,
+      "idempotency_key": "cp_13c",
+      "time": "00:40",
+      "type": "IPO_ALLOTMENT",
+      "headline": "Reliance Power IPO allotment",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_rpower"
+      }
+    },
+    {
+      "checkpoint_id": 13,
+      "idempotency_key": "cp_13d",
+      "time": "00:41",
+      "type": "IPO_LISTING",
+      "headline": "Reliance Power lists on exchange",
+      "phase": "PHASE 1 \u2014 EUPHORIA",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_rpower"
+      }
+    },
+    {
+      "checkpoint_id": 13,
+      "idempotency_key": "cp_13",
+      "time": "00:42",
+      "type": "NEWS",
+      "headline": "Mortgage defaults begin increasing",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Real Estate": -3,
+          "Financials": -2
+        }
+      }
+    },
+    {
+      "checkpoint_id": 14,
+      "idempotency_key": "cp_14",
+      "time": "00:45",
+      "type": "NEWS",
+      "headline": "Housing prices begin falling",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Real Estate": -5,
+          "Financials": -2
+        }
+      }
+    },
+    {
+      "checkpoint_id": 15,
+      "idempotency_key": "cp_15",
+      "time": "00:48",
+      "type": "NEWS",
+      "headline": "Subprime losses emerge",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": -5,
+          "Real Estate": -3
+        }
+      }
+    },
+    {
+      "checkpoint_id": 16,
+      "idempotency_key": "cp_16",
+      "time": "00:51",
+      "type": "NEWS",
+      "headline": "Ratings agencies downgrade mortgage securities",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": -6
+        }
+      }
+    },
+    {
+      "checkpoint_id": 17,
+      "idempotency_key": "cp_17",
+      "time": "00:54",
+      "type": "NEWS",
+      "headline": "Major hedge funds report severe mortgage-related losses",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": -5
+        }
+      }
+    },
+    {
+      "checkpoint_id": 18,
+      "idempotency_key": "cp_18",
+      "time": "00:57",
+      "type": "NEWS",
+      "headline": "International bank freezes mortgage-related funds",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": -5,
+          "Broad Market": -2
+        }
+      }
+    },
+    {
+      "checkpoint_id": 19,
+      "idempotency_key": "cp_19",
+      "time": "01:00",
+      "type": "NEWS",
+      "headline": "Central banks provide emergency liquidity",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": 3,
+          "Broad Market": 2
+        }
+      }
+    },
+    {
+      "checkpoint_id": 20,
+      "idempotency_key": "cp_20",
+      "time": "01:03",
+      "type": "NEWS",
+      "headline": "Markets rebound after emergency intervention",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Broad Market": 4,
+          "Financials": 5
+        }
+      }
+    },
+    {
+      "checkpoint_id": 21,
+      "idempotency_key": "cp_21",
+      "time": "01:06",
+      "type": "NEWS",
+      "headline": "Corporate earnings remain strong despite financial concerns",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "IT": 3,
+          "Consumer": 2,
+          "Industrials": 2
+        }
+      }
+    },
+    {
+      "checkpoint_id": 22,
+      "idempotency_key": "cp_22",
+      "time": "01:10",
+      "type": "IPO_OPEN",
+      "headline": "IPO #2 application opens",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_jkil",
+        "company_name": "J Kumar Infra",
+        "ticker": "JKIL",
+        "issue_price": 110,
+        "lot_size": 50,
+        "total_lots": 800,
+        "winning_lots": 200,
+        "maximum_lots_per_user": 2,
+        "description": "Infrastructure IPO — issue price ₹110"
+      }
+    },
+    {
+      "checkpoint_id": 23,
+      "idempotency_key": "cp_23",
+      "time": "01:13",
+      "type": "NEWS",
+      "headline": "Speculative IPO demand surges",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "IT": 6,
+          "Financials": 2
+        }
+      }
+    },
+    {
+      "checkpoint_id": 24,
+      "idempotency_key": "cp_24",
+      "time": "01:16",
+      "type": "IPO_ALLOTMENT",
+      "headline": "JKIL IPO allotment",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_jkil"
+      }
+    },
+    {
+      "checkpoint_id": 24,
+      "idempotency_key": "cp_24_list",
+      "time": "01:17",
+      "type": "IPO_LISTING",
+      "headline": "JKIL lists on exchange",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_jkil"
+      }
+    },
+    {
+      "checkpoint_id": 24,
+      "idempotency_key": "cp_24b",
+      "time": "01:18",
+      "type": "IPO_OPEN",
+      "headline": "Cords Cable IPO application opens",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_cordscable",
+        "company_name": "Cords Cable",
+        "ticker": "CORDSCABLE",
+        "issue_price": 135,
+        "lot_size": 40,
+        "total_lots": 600,
+        "winning_lots": 150,
+        "maximum_lots_per_user": 2,
+        "description": "Manufacturing IPO — issue price ₹135"
+      }
+    },
+    {
+      "checkpoint_id": 24,
+      "idempotency_key": "cp_24c",
+      "time": "01:20",
+      "type": "IPO_ALLOTMENT",
+      "headline": "Cords Cable IPO allotment",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_cordscable"
+      }
+    },
+    {
+      "checkpoint_id": 24,
+      "idempotency_key": "cp_24d",
+      "time": "01:21",
+      "type": "IPO_LISTING",
+      "headline": "Cords Cable lists on exchange",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_cordscable"
+      }
+    },
+    {
+      "checkpoint_id": 25,
+      "idempotency_key": "cp_25",
+      "time": "01:22",
+      "type": "NEWS",
+      "headline": "Major bank warns credit losses may be significantly larger than expected",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": -7,
+          "Broad Market": -3
+        }
+      }
+    },
+    {
+      "checkpoint_id": 26,
+      "idempotency_key": "cp_26",
+      "time": "01:20",
+      "type": "NEWS",
+      "headline": "Government reassures markets financial system remains stable",
+      "phase": "PHASE 2 \u2014 CRACKS / DENIAL",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": 2,
+          "Broad Market": 2
+        }
+      }
+    },
+    {
+      "checkpoint_id": 27,
+      "idempotency_key": "cp_27",
+      "time": "01:23",
+      "type": "NEWS",
+      "headline": "Foreclosures surge",
+      "phase": "PHASE 3 \u2014 CRASH",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Real Estate": -8,
+          "Financials": -5,
+          "Consumer": -3
+        }
+      }
+    },
+    {
+      "checkpoint_id": 28,
+      "idempotency_key": "cp_28",
+      "time": "01:27",
+      "type": "NEWS",
+      "headline": "Major mortgage lender fails",
+      "phase": "PHASE 3 \u2014 CRASH",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": -10,
+          "Real Estate": -6
+        }
+      }
+    },
+    {
+      "checkpoint_id": 29,
+      "idempotency_key": "cp_29",
+      "time": "01:31",
+      "type": "NEWS",
+      "headline": "Credit markets begin freezing",
+      "phase": "PHASE 3 \u2014 CRASH",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": -8,
+          "Industrials": -4,
+          "Consumer": -3
+        }
+      }
+    },
+    {
+      "checkpoint_id": 30,
+      "idempotency_key": "cp_30",
+      "time": "01:35",
+      "type": "NEWS",
+      "headline": "Major investment bank faces emergency liquidity crisis",
+      "phase": "PHASE 3 \u2014 CRASH",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": -10,
+          "Broad Market": -4
+        }
+      }
+    },
+    {
+      "checkpoint_id": 31,
+      "idempotency_key": "cp_31",
+      "time": "01:39",
+      "type": "NEWS",
+      "headline": "Emergency central-bank intervention",
+      "phase": "PHASE 3 \u2014 CRASH",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": 4,
+          "Broad Market": 2
+        }
+      }
+    },
+    {
+      "checkpoint_id": 32,
+      "idempotency_key": "cp_32",
+      "time": "01:43",
+      "type": "NEWS",
+      "headline": "Major mortgage-finance institutions under severe pressure",
+      "phase": "PHASE 3 \u2014 CRASH",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": -10,
+          "Real Estate": -8
+        }
+      }
+    },
+    {
+      "checkpoint_id": 33,
+      "idempotency_key": "cp_33",
+      "time": "01:47",
+      "type": "NEWS",
+      "headline": "Government announces emergency intervention in mortgage-finance institutions",
+      "phase": "PHASE 3 \u2014 CRASH",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": -6,
+          "Real Estate": -4
+        }
+      }
+    },
+    {
+      "checkpoint_id": 34,
+      "idempotency_key": "cp_34",
+      "time": "01:51",
+      "type": "NEWS",
+      "headline": "Major investment bank announces emergency sale",
+      "phase": "PHASE 3 \u2014 CRASH",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": -12,
+          "Broad Market": -6
+        }
+      }
+    },
+    {
+      "checkpoint_id": 35,
+      "idempotency_key": "cp_35",
+      "time": "01:55",
+      "type": "NEWS",
+      "headline": "LEHMAN BROTHERS FILES FOR BANKRUPTCY (fictional in-game event)",
+      "phase": "PHASE 3 \u2014 CRASH",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": -15,
+          "Real Estate": -10,
+          "Industrials": -7,
+          "Consumer": -5,
+          "IT": -4,
+          "Broad Market": -10
+        }
+      }
+    },
+    {
+      "checkpoint_id": 36,
+      "idempotency_key": "cp_36",
+      "time": "01:55",
+      "type": "COMPANY_DISSOLUTION",
+      "headline": "ICICI Bank dissolved (fictional in-game event)",
+      "phase": "PHASE 3 \u2014 CRASH",
+      "description": "Fictional in-game dissolution",
+      "payload": {
+        "ticker": "ICICIBANK",
+        "liquidation_price": 8
+      }
+    },
+    {
+      "checkpoint_id": 37,
+      "idempotency_key": "cp_37",
+      "time": "01:58",
+      "type": "NEWS",
+      "headline": "AIG requires emergency government support",
+      "phase": "PHASE 3 \u2014 CRASH",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": -12,
+          "Broad Market": -6
+        }
+      }
+    },
+    {
+      "checkpoint_id": 38,
+      "idempotency_key": "cp_38",
+      "time": "02:02",
+      "type": "NEWS",
+      "headline": "Major investment bank acquired in emergency transaction",
+      "phase": "PHASE 3 \u2014 CRASH",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": -8
+        }
+      }
+    },
+    {
+      "checkpoint_id": 39,
+      "idempotency_key": "cp_39",
+      "time": "02:07",
+      "type": "NEWS",
+      "headline": "Massive government financial rescue package proposed",
+      "phase": "PHASE 3 \u2014 CRASH",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": 4,
+          "Broad Market": 3
+        }
+      }
+    },
+    {
+      "checkpoint_id": 40,
+      "idempotency_key": "cp_40",
+      "time": "02:11",
+      "type": "NEWS",
+      "headline": "Government approves emergency financial rescue program",
+      "phase": "PHASE 3 \u2014 CRASH",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": 5,
+          "Broad Market": 4
+        }
+      }
+    },
+    {
+      "checkpoint_id": 41,
+      "idempotency_key": "cp_41",
+      "time": "02:15",
+      "type": "NEWS",
+      "headline": "Global markets plunge",
+      "phase": "PHASE 3 \u2014 CRASH",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Broad Market": -12,
+          "Financials": -15,
+          "Industrials": -8,
+          "Consumer": -7
+        }
+      }
+    },
+    {
+      "checkpoint_id": 42,
+      "idempotency_key": "cp_42",
+      "time": "02:20",
+      "type": "NEWS",
+      "headline": "Recession deepens",
+      "phase": "PHASE 3 \u2014 CRASH",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Industrials": -7,
+          "Consumer": -6,
+          "Financials": -8
+        }
+      }
+    },
+    {
+      "checkpoint_id": 43,
+      "idempotency_key": "cp_43",
+      "time": "02:25",
+      "type": "NEWS",
+      "headline": "Major companies report severe earnings declines",
+      "phase": "PHASE 3 \u2014 CRASH",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Broad Market": -6,
+          "IT": -5,
+          "Consumer": -6,
+          "Industrials": -7
+        }
+      }
+    },
+    {
+      "checkpoint_id": 44,
+      "idempotency_key": "cp_44",
+      "time": "02:30",
+      "type": "NEWS",
+      "headline": "Consumer confidence reaches multi-year low",
+      "phase": "PHASE 3 \u2014 CRASH",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Consumer": -8,
+          "Automobiles": -7,
+          "Financials": -4
+        }
+      }
+    },
+    {
+      "checkpoint_id": 45,
+      "idempotency_key": "cp_45",
+      "time": "02:35",
+      "type": "NEWS",
+      "headline": "Credit conditions remain severely restricted",
+      "phase": "PHASE 3 \u2014 CRASH",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": -8,
+          "Industrials": -5,
+          "Real Estate": -6
+        }
+      }
+    },
+    {
+      "checkpoint_id": 46,
+      "idempotency_key": "cp_46",
+      "time": "02:40",
+      "type": "NEWS",
+      "headline": "Central banks announce coordinated emergency liquidity measures",
+      "phase": "PHASE 4 \u2014 RECOVERY",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": 4,
+          "Broad Market": 3
+        }
+      }
+    },
+    {
+      "checkpoint_id": 47,
+      "idempotency_key": "cp_47",
+      "time": "02:43",
+      "type": "NEWS",
+      "headline": "Central bank cuts interest rates toward emergency levels",
+      "phase": "PHASE 4 \u2014 RECOVERY",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": 6,
+          "Real Estate": 5,
+          "Industrials": 3,
+          "Consumer": 3
+        }
+      }
+    },
+    {
+      "checkpoint_id": 48,
+      "idempotency_key": "cp_48",
+      "time": "02:46",
+      "type": "NEWS",
+      "headline": "Government expands financial support",
+      "phase": "PHASE 4 \u2014 RECOVERY",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Financials": 6,
+          "Industrials": 4,
+          "Infrastructure": 5
+        }
+      }
+    },
+    {
+      "checkpoint_id": 49,
+      "idempotency_key": "cp_49",
+      "time": "02:49",
+      "type": "NEWS",
+      "headline": "Housing markets show early signs of stabilization",
+      "phase": "PHASE 4 \u2014 RECOVERY",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Real Estate": 7,
+          "Financials": 4
+        }
+      }
+    },
+    {
+      "checkpoint_id": 50,
+      "idempotency_key": "cp_50",
+      "time": "02:52",
+      "type": "NEWS",
+      "headline": "Industrial contraction begins slowing",
+      "phase": "PHASE 4 \u2014 RECOVERY",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Industrials": 6,
+          "Metals": 6,
+          "Energy": 5
+        }
+      }
+    },
+    {
+      "checkpoint_id": 51,
+      "idempotency_key": "cp_51",
+      "time": "02:55",
+      "type": "NEWS",
+      "headline": "Consumer confidence stabilizes",
+      "phase": "PHASE 4 \u2014 RECOVERY",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Consumer": 5,
+          "Automobiles": 5
+        }
+      }
+    },
+    {
+      "checkpoint_id": 52,
+      "idempotency_key": "cp_52",
+      "time": "02:56",
+      "type": "IPO_OPEN",
+      "headline": "Recovery IPO application opens",
+      "phase": "PHASE 4 \u2014 RECOVERY",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_20microns",
+        "company_name": "20 Microns",
+        "ticker": "20MICRONS",
+        "issue_price": 55,
+        "lot_size": 100,
+        "total_lots": 500,
+        "winning_lots": 150,
+        "maximum_lots_per_user": 2,
+        "description": "Industrial minerals IPO — issue price ₹55"
+      }
+    },
+    {
+      "checkpoint_id": 53,
+      "idempotency_key": "cp_53",
+      "time": "02:58",
+      "type": "IPO_ALLOTMENT",
+      "headline": "Recovery IPO allotment",
+      "phase": "PHASE 4 \u2014 RECOVERY",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_20microns"
+      }
+    },
+    {
+      "checkpoint_id": 54,
+      "idempotency_key": "cp_54",
+      "time": "02:59",
+      "type": "IPO_LISTING",
+      "headline": "Recovery IPO lists on exchange",
+      "phase": "PHASE 4 \u2014 RECOVERY",
+      "description": "",
+      "payload": {
+        "ipo_key": "ipo_20microns"
+      }
+    },
+    {
+      "checkpoint_id": 55,
+      "idempotency_key": "cp_55",
+      "time": "02:59:30",
+      "type": "NEWS",
+      "headline": "Stock market stages a major recovery rally",
+      "phase": "PHASE 4 \u2014 RECOVERY",
+      "description": "",
+      "payload": {
+        "sector_impacts": {
+          "Broad Market": 8,
+          "Financials": 7,
+          "IT": 7,
+          "Industrials": 7,
+          "Consumer": 6
+        }
+      }
+    },
+    {
+      "checkpoint_id": 56,
+      "idempotency_key": "cp_56",
+      "time": "03:00:00",
+      "type": "SIMULATION_END",
+      "headline": "Simulation complete",
+      "phase": "PHASE 4 \u2014 RECOVERY",
+      "description": "",
+      "payload": {}
+    }
+  ]
+}

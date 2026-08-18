@@ -8,6 +8,7 @@ from app.models.enums import Sector
 from app.schemas import StockCreate, TraderCreate
 from app.services import order_service, portfolio_service, stock_service, trader_service
 from app.ai.runner import seed_default_agents
+from tests.conftest import join_participant
 from app.services.liquidity_service import seed_all_liquidity
 from app.services.execution_summary import build_execution_summary
 
@@ -79,8 +80,7 @@ def test_market_buy_provisions_liquidity_on_empty_book(db_session):
 
 def test_market_order_api_returns_execution_summary(client):
     books.clear()
-    r = client.post("/api/v1/traders", json={"name": "API Buyer"})
-    trader_id = r.json()["id"]
+    trader_id, auth = join_participant(client, "API Buyer")
     client.post("/api/v1/stocks/seed/defaults")
     client.post("/api/v1/admin/bootstrap")
     stocks = client.get("/api/v1/stocks").json()
@@ -95,6 +95,7 @@ def test_market_order_api_returns_execution_summary(client):
             "order_type": "market",
             "quantity": 3,
         },
+        headers=auth,
     )
     assert res.status_code == 201
     body = res.json()
@@ -103,5 +104,5 @@ def test_market_order_api_returns_execution_summary(client):
     if body["executed"]:
         assert body["execution_summary"]["filled_quantity"] == 3
 
-    portfolio = client.get(f"/api/v1/traders/{trader_id}/portfolio").json()
+    portfolio = client.get(f"/api/v1/traders/{trader_id}/portfolio", headers=auth).json()
     assert Decimal(portfolio["cash"]) < Decimal("1000000")

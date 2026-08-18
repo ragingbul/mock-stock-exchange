@@ -1,26 +1,36 @@
 """WebSocket endpoint."""
 
-import logging
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-
+from app.core.security import decode_token
 from app.realtime.ws_manager import manager
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["realtime"])
 
 
 @router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket) -> None:
-    await manager.connect(websocket)
+async def websocket_endpoint(
+    websocket: WebSocket,
+    token: str | None = Query(default=None),
+) -> None:
+    trader_id: int | None = None
+    if token:
+        payload = decode_token(token)
+        raw_id = payload.get("trader_id")
+        if raw_id is not None:
+            trader_id = int(raw_id)
+
+    await manager.connect(websocket, trader_id=trader_id)
     try:
-        await websocket.send_json({"event": "CONNECTED", "payload": {"ok": True}})
+        await websocket.send_json(
+            {
+                "event": "CONNECTED",
+                "payload": {"ok": True, "authenticated": trader_id is not None},
+            }
+        )
         while True:
-            # Keepalive / ignore client pings
             await websocket.receive_text()
     except WebSocketDisconnect:
         await manager.disconnect(websocket)
     except Exception:
-        logger.exception("websocket connection error")
         await manager.disconnect(websocket)

@@ -141,6 +141,9 @@ DEFAULT_STOCKS: list[StockCreate] = [
 
 def seed_default_stocks(db: Session, *, skip_existing: bool = True) -> int:
     """Insert default stocks. Returns count of newly created rows."""
+    from app.services import sector_service
+
+    sector_service.ensure_sectors(db)
     created = 0
     for spec in DEFAULT_STOCKS:
         existing = stock_service.get_stock_by_ticker(db, spec.ticker)
@@ -150,4 +153,5 @@ def seed_default_stocks(db: Session, *, skip_existing: bool = True) -> int:
             continue
         stock_service.create_stock(db, spec)
         created += 1
+    sector_service.backfill_stock_sectors(db)
     return created

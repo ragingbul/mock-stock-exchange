@@ -90,9 +90,19 @@ def submit_order(
         raise OrderGatewayError("limit order requires positive price", rejected_order=order)
 
     session = _active_session(db)
+    from app.models.enums import SimulationStatus, StockStatus
+    from app.services.simulation_clock import get_or_create_state
+
+    sim = get_or_create_state(db)
+    if sim.status != SimulationStatus.RUNNING:
+        order = reject(f"simulation is {sim.status.value}")
+        raise OrderGatewayError(f"simulation is {sim.status.value}", rejected_order=order)
     if session and session.status in {MarketSessionStatus.PAUSED, MarketSessionStatus.CLOSED}:
         order = reject(f"market is {session.status.value}")
         raise OrderGatewayError(f"market is {session.status.value}", rejected_order=order)
+    if getattr(stock, "status", StockStatus.ACTIVE.value) == StockStatus.DISSOLVED.value:
+        order = reject("stock is dissolved")
+        raise OrderGatewayError("stock is dissolved", rejected_order=order)
     if not stock.is_open or stock.is_halted:
         order = reject("stock is closed or halted")
         raise OrderGatewayError("stock is closed or halted", rejected_order=order)
@@ -190,6 +200,16 @@ def submit_order(
     db.refresh(order)
     for t in trades:
         db.refresh(t)
+
+    # After sells, shrink/cancel stop-loss & take-profit tied to this position
+    if side == OrderSide.SELL and filled_qty > 0:
+        try:
+            from app.services import conditional_order_service
+
+            conditional_order_service.cancel_for_position_closed(db, trader_id, stock_id)
+        except Exception:
+            pass
+
     return order, trades
 
 

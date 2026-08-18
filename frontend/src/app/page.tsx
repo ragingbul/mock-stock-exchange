@@ -21,33 +21,39 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-4xl flex-col justify-center px-6 py-16">
-      <p className="font-mono text-xs uppercase tracking-[0.2em] text-accent">
-        Mock Stock Exchange
+    <main className="mx-auto flex min-h-screen max-w-4xl flex-col justify-center px-6 py-16 bg-black text-white">
+      <p className="font-mono text-xs uppercase tracking-[0.2em] text-[#22c55e]">
+        TRADEVERSE
       </p>
       <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">
-        Trade the book, not the formula.
+        Three hours. One market. Your call.
       </h1>
-      <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted">
-        Orders hit an order book. The matching engine discovers price. News and
-        models move agents — never last traded price directly.
+      <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/60">
+        A cinematic stock simulation driven by a preloaded timeline. Trade live
+        news, IPOs, and a crash — while admins run START, STOP, and RESET.
       </p>
       <div className="mt-8 flex flex-wrap gap-3">
         <Link
           href="/terminal"
-          className="bg-accent px-5 py-3 font-mono text-sm text-black"
+          className="bg-[#22c55e] px-5 py-3 font-mono text-sm text-black"
         >
           Open terminal
         </Link>
         <Link
           href="/admin"
-          className="border border-line px-5 py-3 font-mono text-sm"
+          className="border border-white/25 px-5 py-3 font-mono text-sm"
         >
           Admin panel
         </Link>
+        <Link
+          href="/market-screen"
+          className="border border-white/25 px-5 py-3 font-mono text-sm"
+        >
+          Market screen
+        </Link>
       </div>
-      <p className="mt-8 font-mono text-xs text-muted">
-        API {health ? `phase ${health.phase} · ${health.status}` : "offline"} ·{" "}
+      <p className="mt-8 font-mono text-xs text-white/40">
+        API {health ? `${health.status}` : "offline"} ·{" "}
         <a className="underline" href={`${getApiBaseUrl()}/docs`}>
           docs
         </a>

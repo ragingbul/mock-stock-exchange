@@ -23,12 +23,19 @@ def create_db_engine(url: str | None = None) -> Engine:
     settings = get_settings()
     database_url = url or settings.database_url
     connect_args = _sqlite_connect_args(database_url)
-    engine = create_engine(
-        database_url,
-        pool_pre_ping=not database_url.startswith("sqlite"),
-        future=True,
-        connect_args=connect_args,
-    )
+    engine_kwargs: dict = {
+        "pool_pre_ping": not database_url.startswith("sqlite"),
+        "future": True,
+        "connect_args": connect_args,
+    }
+    if not database_url.startswith("sqlite"):
+        engine_kwargs.update(
+            pool_size=settings.db_pool_size,
+            max_overflow=settings.db_max_overflow,
+            pool_recycle=settings.db_pool_recycle,
+            pool_timeout=settings.db_pool_timeout,
+        )
+    engine = create_engine(database_url, **engine_kwargs)
 
     if database_url.startswith("sqlite"):
 
@@ -72,3 +79,78 @@ def init_db(target_engine: Engine | None = None) -> None:
 
     bind = target_engine or engine
     Base.metadata.create_all(bind=bind)
+    _ensure_sqlite_columns(bind)
+
+
+def _ensure_sqlite_columns(bind: Engine) -> None:
+    """Add newly introduced columns on existing SQLite databases."""
+    url = str(bind.url)
+    if not url.startswith("sqlite"):
+        return
+    with bind.connect() as conn:
+        def _cols(table: str) -> set[str]:
+            try:
+                return {row[1] for row in conn.execute(text(f"PRAGMA table_info({table})")).fetchall()}
+            except Exception:
+                return set()
+
+        stock_cols = _cols("stocks")
+        if stock_cols and "sector_id" not in stock_cols:
+            conn.execute(text("ALTER TABLE stocks ADD COLUMN sector_id INTEGER"))
+
+        trader_cols = _cols("traders")
+        if trader_cols and "cash_blocked_ipo" not in trader_cols:
+            conn.execute(
+                text("ALTER TABLE traders ADD COLUMN cash_blocked_ipo NUMERIC(18,2) DEFAULT 0")
+            )
+
+        news_cols = _cols("news_events")
+        alters = [
+            ("market_wide_impact_pct", "NUMERIC(8,4)"),
+            ("sector_impacts_json", "TEXT DEFAULT '{}'"),
+            ("stock_impacts_json", "TEXT DEFAULT '{}'"),
+            ("status", "VARCHAR(32) DEFAULT 'draft'"),
+            ("baseline_prices_json", "TEXT DEFAULT '{}'"),
+        ]
+        if news_cols:
+            for name, decl in alters:
+                if name not in news_cols:
+                    conn.execute(text(f"ALTER TABLE news_events ADD COLUMN {name} {decl}"))
+
+        stock_cols = _cols("stocks")
+        if stock_cols and "status" not in stock_cols:
+            conn.execute(text("ALTER TABLE stocks ADD COLUMN status VARCHAR(32) DEFAULT 'active'"))
+        if stock_cols and "liquidation_price" not in stock_cols:
+            conn.execute(text("ALTER TABLE stocks ADD COLUMN liquidation_price NUMERIC(18,4)"))
+
+        ipo_cols = _cols("ipos")
+        if ipo_cols and "timeline_key" not in ipo_cols:
+            conn.execute(text("ALTER TABLE ipos ADD COLUMN timeline_key VARCHAR(64)"))
+
+        settings_cols = _cols("simulation_settings")
+        settings_alters = [
+            ("sim_duration_sec", "FLOAT DEFAULT 10800"),
+            ("sim_speed_multiplier", "FLOAT DEFAULT 1"),
+            ("simulation_seed", "INTEGER DEFAULT 42"),
+            ("simulation_ai_enabled", "BOOLEAN DEFAULT 1"),
+        ]
+        if settings_cols:
+            for name, decl in settings_alters:
+                if name not in settings_cols:
+                    conn.execute(text(f"ALTER TABLE simulation_settings ADD COLUMN {name} {decl}"))
+
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS sectors (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    slug VARCHAR(64) NOT NULL UNIQUE,
+                    name VARCHAR(128) NOT NULL,
+                    display_order INTEGER NOT NULL DEFAULT 0,
+                    is_active BOOLEAN NOT NULL DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+        conn.commit()
