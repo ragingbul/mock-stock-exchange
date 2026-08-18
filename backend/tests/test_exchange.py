@@ -307,3 +307,132 @@ def test_api_match_flow(client):
     assert book.status_code == 200
     lb = client.get("/api/v1/leaderboard")
     assert lb.status_code == 200
+
+
+def test_news_release_is_idempotent(db_session):
+    from datetime import datetime, timezone
+
+    from app.models import Stock
+    from app.seed.stocks import seed_default_stocks
+
+    seed_default_stocks(db_session)
+    stock = db_session.query(Stock).filter_by(ticker="TECHNOVA").one()
+    before = stock.fair_value
+
+    event = create_news(
+        db_session,
+        title="Contract win",
+        description="TechNova wins contract",
+        affected_tickers="TECHNOVA",
+        direction=1,
+        impact=Decimal("0.75"),
+        confidence=Decimal("0.9"),
+        duration_minutes=20,
+        decay_rate=Decimal("0.05"),
+        fundamental_impact_pct=Decimal("5"),
+    )
+    release_news(db_session, event.id, now=datetime.now(timezone.utc))
+    db_session.refresh(stock)
+    after_first = stock.fair_value
+
+    release_news(db_session, event.id, now=datetime.now(timezone.utc))
+    db_session.refresh(stock)
+    after_second = stock.fair_value
+
+    assert after_first != before
+    assert after_second == after_first
+
+
+def test_book_rebuild_from_db(db_session):
+    from app.models import Order, OrderStatus
+
+    books.clear()
+    trader = trader_service.create_trader(db_session, TraderCreate(name="T1"))
+    stock = stock_service.create_stock(
+        db_session,
+        StockCreate(
+            ticker="RB",
+            company_name="Rebuild Co",
+            sector=Sector.TECH,
+            starting_price=Decimal("100"),
+            shares_outstanding=1_000_000,
+            fair_value=Decimal("100"),
+        ),
+    )
+    order = Order(
+        trader_id=trader.id,
+        stock_id=stock.id,
+        side=OrderSide.SELL,
+        order_type=OrderType.LIMIT,
+        quantity=50,
+        remaining_quantity=50,
+        price=Decimal("105"),
+        status=OrderStatus.OPEN,
+    )
+    db_session.add(order)
+    db_session.commit()
+
+    books.clear()
+    assert books.get(stock.id).best_ask() is None
+
+    restored = books.rebuild_from_db(db_session)
+    assert restored == 1
+    ask = books.get(stock.id).best_ask()
+    assert ask is not None
+    assert ask.order_id == order.id
+    assert ask.quantity == 50
+
+
+def test_get_book_unknown_stock_returns_404(client):
+    res = client.get("/api/v1/market/99999/book")
+    assert res.status_code == 404
+
+
+def test_start_session_closes_prior_open_sessions(client):
+    first = client.post("/api/v1/admin/session/start", params={"name": "A"})
+    second = client.post("/api/v1/admin/session/start", params={"name": "B"})
+    assert first.status_code == 200
+    assert second.status_code == 200
+
+    first_id = first.json()["id"]
+    second_id = second.json()["id"]
+    assert second_id > first_id
+
+    overview = client.get("/api/v1/admin/overview").json()
+    assert overview["session_id"] == second_id
+    assert overview["session_status"] == "open"
+
+
+def test_bootstrap_is_idempotent(client):
+    books.clear()
+    first = client.post("/api/v1/admin/bootstrap")
+    second = client.post("/api/v1/admin/bootstrap")
+    assert first.status_code == 200
+    assert second.status_code == 200
+
+    first_body = first.json()
+    second_body = second.json()
+    assert first_body["stocks_created"] > 0
+    assert first_body["agents_created"] > 0
+    assert first_body["liquidity_quotes"] > 0
+
+    assert second_body["stocks_created"] == 0
+    assert second_body["agents_created"] == 0
+    assert second_body["already_bootstrapped"] is True
+    assert second_body["session_reused"] is True
+    assert second_body["session_id"] == first_body["session_id"]
+    assert second_body["liquidity_quotes"] == 0
+
+
+def test_bootstrap_resumes_paused_session(client):
+    books.clear()
+    boot = client.post("/api/v1/admin/bootstrap").json()
+    client.post("/api/v1/admin/session/pause")
+    resumed = client.post("/api/v1/admin/bootstrap").json()
+
+    assert resumed["already_bootstrapped"] is True
+    assert resumed["session_reused"] is True
+    assert resumed["session_id"] == boot["session_id"]
+
+    overview = client.get("/api/v1/admin/overview").json()
+    assert overview["session_status"] == "open"

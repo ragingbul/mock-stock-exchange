@@ -185,3 +185,28 @@ def seed_all_liquidity(db: Session, *, quote_size: int | None = None) -> int:
     for stock in stock_service.list_stocks(db):
         total += provision_two_sided_quotes(db, stock, quote_size=size)
     return total
+
+
+def mm_has_two_sided_quotes(db: Session, stock: Stock) -> bool:
+    """True when the market-maker already has resting bid and ask on this stock."""
+    agent = _market_maker_agent(db)
+    if agent is None:
+        return False
+    book = books.get(stock.id)
+    has_bid = any(entry.trader_id == agent.trader_id for entry in book.bids)
+    has_ask = any(entry.trader_id == agent.trader_id for entry in book.asks)
+    return has_bid and has_ask
+
+
+def seed_liquidity_if_needed(db: Session, *, quote_size: int | None = None) -> int:
+    """Seed MM quotes only for stocks that lack two-sided liquidity."""
+    from app.services import stock_service
+
+    settings = get_settings()
+    size = quote_size if quote_size is not None else settings.mm_quote_size
+    total = 0
+    for stock in stock_service.list_stocks(db):
+        if mm_has_two_sided_quotes(db, stock):
+            continue
+        total += provision_two_sided_quotes(db, stock, quote_size=size)
+    return total
