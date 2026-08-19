@@ -9,3 +9,8 @@ healthcheckPath = "/api/v1/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
 numReplicas = 1
+
+# Required env (set in Railway dashboard):
+# DATABASE_URL = Supabase direct Postgres URI (see supabase/README.md)
+# JWT_SECRET, ADMIN_SECRET, CORS_ORIGINS, FRONTEND_URL, BACKEND_URL
+# ENVIRONMENT=production, AUTO_INIT_DB=false, SIMULATION_SPEED=1

@@ -4,32 +4,27 @@ import type { LeaderboardRow } from "@/components/Leaderboard";
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
 const REQUEST_TIMEOUT_MS = 30_000;
 
-function defaultHeaders(): HeadersInit {
-  const headers: Record<string, string> = {};
-  if (typeof window !== "undefined" && window.location.hostname.endsWith(".ngrok-free.dev")) {
-    headers["ngrok-skip-browser-warning"] = "1";
-  }
-  return headers;
-}
-
 function isProductionBuild(): boolean {
   return process.env.NODE_ENV === "production";
 }
 
-/** Resolve API base URL: env override, same-origin in prod browser, else dev fallback. */
-export function getApiBaseUrl(): string {
+function requireApiBaseUrl(): string {
   const envUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
   if (envUrl) return envUrl;
   if (isProductionBuild()) {
-    if (typeof window !== "undefined") {
-      return window.location.origin;
-    }
-    return "http://localhost";
+    throw new Error(
+      "NEXT_PUBLIC_API_URL is required in production. Set it in Vercel environment variables.",
+    );
   }
   if (typeof window !== "undefined") {
     return `http://${window.location.hostname}:8000`;
   }
   return "http://localhost:8000";
+}
+
+/** Resolve API base URL from env (required in production on Vercel). */
+export function getApiBaseUrl(): string {
+  return requireApiBaseUrl();
 }
 
 export function apiUrl(path: string): string {
@@ -39,7 +34,9 @@ export function apiUrl(path: string): string {
 
 export function wsUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_WS_URL?.replace(/\/$/, "");
-  const base = explicit ?? getApiBaseUrl().replace(/^http/, "ws");
+  const base =
+    explicit ??
+    getApiBaseUrl().replace(/^https:/, "wss:").replace(/^http:/, "ws:");
   const path = `${base}${API_PREFIX}/ws`;
   if (typeof window === "undefined") return path;
   const token = window.localStorage.getItem("mse_access_token");
@@ -64,7 +61,7 @@ async function fetchWithTimeout(
   try {
     return await fetch(input, {
       ...init,
-      headers: { ...defaultHeaders(), ...authHeaders(), ...(init?.headers ?? {}) },
+      headers: { ...authHeaders(), ...(init?.headers ?? {}) },
       signal: controller.signal,
     });
   } catch (e) {
@@ -81,7 +78,17 @@ async function parseError(res: Response): Promise<string> {
   const text = await res.text();
   try {
     const json = JSON.parse(text);
-    if (json.detail) return String(json.detail);
+    if (json.detail) {
+      if (Array.isArray(json.detail)) {
+        return json.detail
+          .map((item: { loc?: unknown[]; msg?: string }) => {
+            const loc = Array.isArray(item.loc) ? item.loc.join(".") : "";
+            return loc ? `${loc}: ${item.msg ?? "validation error"}` : String(item.msg ?? item);
+          })
+          .join("; ");
+      }
+      return String(json.detail);
+    }
   } catch {
     /* use raw text */
   }

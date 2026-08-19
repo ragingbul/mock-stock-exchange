@@ -143,6 +143,7 @@ def test_api_create_traders_and_portfolio(client) -> None:
     holding = client.put(
         f"/api/v1/traders/{trader_id}/holdings",
         json={"stock_id": stock_id, "quantity": 10, "avg_cost": "100"},
+        headers=auth,
     )
     assert holding.status_code == 200
     assert holding.json()["quantity"] == 10

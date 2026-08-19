@@ -1,0 +1,37 @@
+# Render Blueprint — TRADEVERSE API worker (alternative to Railway)
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: tradeverse-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: starter
+    numInstances: 1
+    healthCheckPath: /api/v1/health
+    preDeployCommand: alembic upgrade head
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: AUTO_INIT_DB
+        value: "false"
+      - key: SIMULATION_SPEED
+        value: "1"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        sync: false
+      - key: BACKEND_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: DB_POOL_SIZE
+        value: "10"
+      - key: DB_MAX_OVERFLOW
+        value: "15"

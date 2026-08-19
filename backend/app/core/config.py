@@ -29,17 +29,11 @@ class Settings(BaseSettings):
     # Server
     backend_host: str = "0.0.0.0"
     backend_port: int = 8000
-    backend_url: str = Field(default="http://localhost:8000", validation_alias="BACKEND_URL")
-    frontend_url: str = Field(default="http://localhost:3000", validation_alias="FRONTEND_URL")
+    backend_url: str = Field(default="", validation_alias="BACKEND_URL")
+    frontend_url: str = Field(default="", validation_alias="FRONTEND_URL")
 
-    # CORS — frontend origin(s); include common dev ports
-    cors_origins: str = Field(
-        default=(
-            "http://localhost:3000,http://localhost:3001,"
-            "http://127.0.0.1:3000,http://127.0.0.1:3001"
-        ),
-        validation_alias="CORS_ORIGINS",
-    )
+    # CORS — comma-separated Vercel (and preview) origins
+    cors_origins: str = Field(default="", validation_alias="CORS_ORIGINS")
 
     # Database (PostgreSQL by default; override with DATABASE_URL for tests/sqlite)
     postgres_user: str = "mse"
@@ -106,14 +100,22 @@ class Settings(BaseSettings):
         if url.startswith("postgres://"):
             return "postgresql+psycopg://" + url[len("postgres://") :]
         if url.startswith("postgresql://") and "+psycopg" not in url:
-            return "postgresql+psycopg://" + url[len("postgresql://") :]
+            url = "postgresql+psycopg://" + url[len("postgresql://") :]
+        if "supabase" in url and "sslmode=" not in url:
+            sep = "&" if "?" in url else "?"
+            url = f"{url}{sep}sslmode=require"
         return url
 
     @property
     def cors_origin_list(self) -> list[str]:
         origins = [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
-        if self.frontend_url and self.frontend_url not in origins:
+        if self.frontend_url and self.frontend_url.rstrip("/") not in origins:
             origins.append(self.frontend_url.rstrip("/"))
+        if not origins and not self.is_production:
+            origins = [
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+            ]
         return origins
 
 

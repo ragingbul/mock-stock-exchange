@@ -75,6 +75,8 @@ def release_news(db: Session, event_id: int, *, now: datetime | None = None) -> 
         raise ValueError("news not found")
     if event.status == "cancelled":
         raise ValueError("news was cancelled")
+    if event.is_released:
+        return event
     now = now or datetime.now(timezone.utc)
     event.is_released = True
     event.released_at = now

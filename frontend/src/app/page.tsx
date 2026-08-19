@@ -13,11 +13,17 @@ type HealthResponse = {
 
 export default function Home() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [apiDocsUrl, setApiDocsUrl] = useState<string | null>(null);
 
   useEffect(() => {
     apiGet<HealthResponse>("/health")
       .then(setHealth)
       .catch(() => setHealth(null));
+    try {
+      setApiDocsUrl(`${getApiBaseUrl()}/docs`);
+    } catch {
+      setApiDocsUrl(null);
+    }
   }, []);
 
   return (
@@ -53,10 +59,16 @@ export default function Home() {
         </Link>
       </div>
       <p className="mt-8 font-mono text-xs text-white/40">
-        API {health ? `${health.status}` : "offline"} ·{" "}
-        <a className="underline" href={`${getApiBaseUrl()}/docs`}>
-          docs
-        </a>
+        API {health ? `${health.status}` : "offline"}
+        {apiDocsUrl ? (
+          <>
+            {" "}
+            ·{" "}
+            <a className="underline" href={apiDocsUrl}>
+              docs
+            </a>
+          </>
+        ) : null}
       </p>
     </main>
   );
