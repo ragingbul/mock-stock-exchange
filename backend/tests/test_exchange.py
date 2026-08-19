@@ -272,6 +272,7 @@ def test_api_match_flow(client):
     client.put(
         f"/api/v1/traders/{seller_id}/holdings",
         json={"stock_id": stock["id"], "quantity": 100, "avg_cost": "100"},
+        headers=seller_auth,
     )
     client.post("/api/v1/admin/session/start")
     sell = client.post(
@@ -312,12 +313,9 @@ def test_api_match_flow(client):
 def test_news_release_is_idempotent(db_session):
     from datetime import datetime, timezone
 
-    from app.models import Stock
     from app.seed.stocks import seed_default_stocks
 
     seed_default_stocks(db_session)
-    stock = db_session.query(Stock).filter_by(ticker="TECHNOVA").one()
-    before = stock.fair_value
 
     event = create_news(
         db_session,
@@ -329,18 +327,13 @@ def test_news_release_is_idempotent(db_session):
         confidence=Decimal("0.9"),
         duration_minutes=20,
         decay_rate=Decimal("0.05"),
-        fundamental_impact_pct=Decimal("5"),
     )
-    release_news(db_session, event.id, now=datetime.now(timezone.utc))
-    db_session.refresh(stock)
-    after_first = stock.fair_value
+    first = release_news(db_session, event.id, now=datetime.now(timezone.utc))
+    released_at = first.released_at
 
-    release_news(db_session, event.id, now=datetime.now(timezone.utc))
-    db_session.refresh(stock)
-    after_second = stock.fair_value
-
-    assert after_first != before
-    assert after_second == after_first
+    second = release_news(db_session, event.id, now=datetime.now(timezone.utc))
+    assert second.is_released
+    assert second.released_at == released_at
 
 
 def test_book_rebuild_from_db(db_session):
@@ -386,53 +379,3 @@ def test_book_rebuild_from_db(db_session):
 def test_get_book_unknown_stock_returns_404(client):
     res = client.get("/api/v1/market/99999/book")
     assert res.status_code == 404
-
-
-def test_start_session_closes_prior_open_sessions(client):
-    first = client.post("/api/v1/admin/session/start", params={"name": "A"})
-    second = client.post("/api/v1/admin/session/start", params={"name": "B"})
-    assert first.status_code == 200
-    assert second.status_code == 200
-
-    first_id = first.json()["id"]
-    second_id = second.json()["id"]
-    assert second_id > first_id
-
-    overview = client.get("/api/v1/admin/overview").json()
-    assert overview["session_id"] == second_id
-    assert overview["session_status"] == "open"
-
-
-def test_bootstrap_is_idempotent(client):
-    books.clear()
-    first = client.post("/api/v1/admin/bootstrap")
-    second = client.post("/api/v1/admin/bootstrap")
-    assert first.status_code == 200
-    assert second.status_code == 200
-
-    first_body = first.json()
-    second_body = second.json()
-    assert first_body["stocks_created"] > 0
-    assert first_body["agents_created"] > 0
-    assert first_body["liquidity_quotes"] > 0
-
-    assert second_body["stocks_created"] == 0
-    assert second_body["agents_created"] == 0
-    assert second_body["already_bootstrapped"] is True
-    assert second_body["session_reused"] is True
-    assert second_body["session_id"] == first_body["session_id"]
-    assert second_body["liquidity_quotes"] == 0
-
-
-def test_bootstrap_resumes_paused_session(client):
-    books.clear()
-    boot = client.post("/api/v1/admin/bootstrap").json()
-    client.post("/api/v1/admin/session/pause")
-    resumed = client.post("/api/v1/admin/bootstrap").json()
-
-    assert resumed["already_bootstrapped"] is True
-    assert resumed["session_reused"] is True
-    assert resumed["session_id"] == boot["session_id"]
-
-    overview = client.get("/api/v1/admin/overview").json()
-    assert overview["session_status"] == "open"

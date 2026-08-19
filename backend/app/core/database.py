@@ -13,10 +13,14 @@ class Base(DeclarativeBase):
     """SQLAlchemy declarative base for all ORM models."""
 
 
+def _postgres_connect_args(url: str) -> dict:
+    return {"connect_timeout": 15}
+
+
 def _sqlite_connect_args(url: str) -> dict:
     if url.startswith("sqlite"):
         return {"check_same_thread": False}
-    return {"connect_timeout": 2}
+    return _postgres_connect_args(url)
 
 
 def create_db_engine(url: str | None = None) -> Engine:

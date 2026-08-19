@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """50-user concurrent load test for TRADEVERSE live events.
 
-Modes:
-  LOCAL:  python load_test_50_users.py --base-url http://localhost:8000
-  CLOUD:  python load_test_50_users.py --base-url https://YOUR-API.up.railway.app
+Example:
+  python load_test_50_users.py --base-url https://your-api.up.railway.app --users 50
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import random
 import statistics
 import time
@@ -163,8 +163,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="TRADEVERSE 50-user load test")
     parser.add_argument(
         "--base-url",
-        default="http://localhost:8000",
-        help="LOCAL: http://localhost:8000 | CLOUD: https://your-api.up.railway.app",
+        default=os.environ.get("API_BASE_URL", ""),
+        required=not os.environ.get("API_BASE_URL"),
+        help="Cloud API URL, e.g. https://your-api.up.railway.app (or set API_BASE_URL)",
     )
     parser.add_argument("--users", type=int, default=50)
     parser.add_argument("--duration", type=float, default=60.0)

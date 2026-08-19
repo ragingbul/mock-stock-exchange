@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+import os
+
+# Isolate tests from repo-root .env (e.g. ENVIRONMENT=production for cloud deploy)
+os.environ["ENVIRONMENT"] = "development"
+os.environ["DEBUG"] = "true"
+os.environ["AUTO_INIT_DB"] = "true"
+os.environ.pop("DATABASE_URL", None)
+
 import app.models  # noqa: F401 — register metadata
 import pytest
 from fastapi.testclient import TestClient

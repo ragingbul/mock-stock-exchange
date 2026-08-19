@@ -263,6 +263,7 @@ def test_conditionals_api(client):
     client.put(
         f"/api/v1/traders/{trader_id}/holdings",
         json={"stock_id": stock["id"], "quantity": 50, "avg_cost": stock["last_traded_price"]},
+        headers=auth,
     )
     ltp = float(stock["last_traded_price"])
     created = client.post(

@@ -1,75 +1,37 @@
-# TRADEVERSE Production Readiness Checklist
+# Production readiness — TRADEVERSE (cloud)
 
-Use this checklist before a live ~50-participant event on Railway.
+Use this checklist before a live event. Deployment target: **Vercel + Supabase + Railway** (see [DEPLOYMENT.md](DEPLOYMENT.md)).
 
 ## Infrastructure
 
-- [ ] Railway backend deployed (root: `backend/`, **1 replica**)
-- [ ] Railway frontend deployed (root: `frontend/`)
-- [ ] PostgreSQL connected (`DATABASE_URL` auto-normalized to `+psycopg`)
-- [ ] Migrations run via **release command** (`alembic upgrade head`), not on every restart
-- [ ] HTTPS working on frontend and API
-- [ ] WSS working (`NEXT_PUBLIC_WS_URL` or derived from API URL)
-- [ ] Health check: `GET /api/v1/health` returns `database: ok`
+- [ ] Supabase project created; `alembic upgrade head` succeeded on production `DATABASE_URL`
+- [ ] API worker: **1 replica**, `workers=1`, health `/api/v1/health` returns `database: ok`
+- [ ] Vercel: `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` point to API worker (HTTPS/WSS)
+- [ ] `CORS_ORIGINS` includes production Vercel URL (and preview pattern if testing previews)
+- [ ] `JWT_SECRET` and `ADMIN_SECRET` are strong, unique secrets (not defaults)
+- [ ] `SIMULATION_SPEED=1` for live event (`60` only for rehearsal)
 
-## Auth
+## Pre-event
 
-- [ ] Participant authentication via `POST /api/v1/auth/join`
-- [ ] Admin authentication via `ADMIN_SECRET` bearer
-- [ ] Trader identity server-authoritative (JWT on orders/wallet/portfolio)
-- [ ] Admin endpoints protected
-- [ ] Open `POST /traders` disabled in production
-- [ ] WebSocket private events require participant token (`?token=`)
+- [ ] Admin **RESET** → `"Canonical stock universe loaded successfully"`
+- [ ] Do **not** press START until go-live
+- [ ] Supabase backup taken after final RESET
+- [ ] Load test: `python backend/scripts/load_test_50_users.py --base-url https://your-api... --users 50`
+- [ ] Sync smoke test: `python backend/scripts/smoke_test_sync.py --base-url https://your-api...`
 
-## Market
+## Multi-device sync verification
 
-- [ ] Canonical stock universe complete after RESET (`Canonical stock universe loaded successfully`)
-- [ ] Tradable count matches source (`canonical_tradable_count()`)
-- [ ] Every stock mapped to a sector (including metals + IPO listings)
-- [ ] Sector averages correct on `/market/sectors`
-- [ ] BUY / SELL work with JWT
-- [ ] Wallet and P&L correct after trades
+- [ ] Three browsers join as different traders — same LTP on all screens after a trade
+- [ ] Trade on device A → device B wallet updates within ~2s (WebSocket)
+- [ ] Admin START → all terminals show trading enabled
+- [ ] Market screen phase/news matches admin status
 
-## Simulation
+## During event
 
-- [ ] One simulation worker (`--workers 1`, `numReplicas = 1`)
-- [ ] Advisory lock fail-closed (`pg_try_advisory_lock`)
-- [ ] `SIMULATION_SPEED=1` in production (explicit env override only)
-- [ ] START / STOP / RESET via admin
-- [ ] Timeline idempotency (EXECUTED events not replayed)
-- [ ] News, AI, IPO, dissolution timeline-driven
-- [ ] 03:00 completion (`sim_duration_sec`)
+- [ ] Do not redeploy API worker mid-simulation (in-memory order books)
+- [ ] Monitor API logs and Supabase connection pool
+- [ ] Keep laptop/plugged power if hosting admin from a local browser (participants use Vercel URL only)
 
-## Realtime
+## Removed deployment modes
 
-- [ ] WebSocket authentication (participant token)
-- [ ] Public market screen receives public events only
-- [ ] Terminal reconnect + `/session/bootstrap` resync
-- [ ] Leaderboard / wallet / IPO state in bootstrap
-
-## Reliability
-
-- [ ] Local load test: `python backend/scripts/load_test_50_users.py --base-url http://localhost:8000 --users 50`
-- [ ] Cloud load test against Railway HTTPS URL
-- [ ] Simultaneous trades (50 users)
-- [ ] Reconnect/bootstrap subset during load test
-- [ ] IPO cycle rehearsal (`SIMULATION_SPEED=60` on staging)
-- [ ] Dissolution checkpoint verified
-- [ ] PostgreSQL backup taken before event (see DEPLOYMENT.md)
-
-## Localhost audit (production bugs only)
-
-| Location | Classification |
-|----------|----------------|
-| `frontend/src/lib/api.ts` | Dev fallback only; prod build requires `NEXT_PUBLIC_API_URL` |
-| `backend/app/core/config.py` defaults | Dev-only; set env on Railway |
-| `docker-compose.yml` localhost CORS | Local reference stack only |
-| `.env.example` | Documentation |
-| Load test `--base-url` default | CLI default for local runs |
-
-## Remaining architectural constraints
-
-- Single backend instance only (WS + sim worker in-memory)
-- WS connect without token = public events only
-- Restart mid-RUNNING resumes from DB state; EXECUTED timeline rows are not replayed
-- Baseline Alembic migration only — future schema changes need new revisions
+Local Docker, LAN nginx, OCI VM, and ngrok workflows are **not supported** in this branch. All participants connect via the public Vercel URL.
