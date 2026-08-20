@@ -7,11 +7,20 @@ $ErrorActionPreference = "Stop"
 $RootDir = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 Set-Location $RootDir
 
-$NgrokApi = if ($env:NGROK_API) { $env:NGROK_API } else { "http://127.0.0.1:4040/api/tunnels" }
-$HealthUrl = if ($env:HEALTH_URL) { $env:HEALTH_URL } else { "http://127.0.0.1/api/v1/health" }
+if ($env:NGROK_API) {
+    $NgrokApi = $env:NGROK_API
+} else {
+    $NgrokApi = "http://127.0.0.1:4040/api/tunnels"
+}
+
+if ($env:HEALTH_URL) {
+    $HealthUrl = $env:HEALTH_URL
+} else {
+    $HealthUrl = "http://127.0.0.1/api/v1/health"
+}
 
 if (-not (Test-Path ".env")) {
-    Write-Error "Missing .env — run .\scripts\local\setup-env.ps1 first."
+    Write-Error "Missing .env - run .\scripts\local\setup-env.ps1 first."
 }
 
 $ngrokCmd = Get-Command ngrok -ErrorAction SilentlyContinue
@@ -43,8 +52,7 @@ $publicUrl = Get-NgrokPublicUrl
 if (-not $publicUrl) {
     Write-Host "==> Starting ngrok http 80"
     $logPath = Join-Path $env:TEMP "tradeverse-ngrok.log"
-    Start-Process -FilePath "ngrok" -ArgumentList @("http", "80", "--log=stdout") `
-        -RedirectStandardOutput $logPath -WindowStyle Hidden
+    Start-Process -FilePath "ngrok" -ArgumentList @("http", "80", "--log=stdout") -RedirectStandardOutput $logPath -WindowStyle Hidden
     for ($i = 0; $i -lt 30; $i++) {
         Start-Sleep -Seconds 1
         $publicUrl = Get-NgrokPublicUrl

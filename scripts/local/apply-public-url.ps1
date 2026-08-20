@@ -23,23 +23,30 @@ if ($corsLine) {
     $existing = ($corsLine -replace "^CORS_ORIGINS=", "").Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ }
 }
 
-$origins = [System.Collections.Generic.List[string]]::new()
-foreach ($o in @("http://localhost", "http://127.0.0.1") + $existing + @($publicUrl)) {
-    if (-not $origins.Contains($o)) { $origins.Add($o) }
-}
-if ($publicUrl -match "ngrok") {
-    $filtered = [System.Collections.Generic.List[string]]::new()
-    foreach ($o in $origins) {
-        if ($o -eq $publicUrl -or $o -notmatch "ngrok") { $filtered.Add($o) }
+$origins = New-Object "System.Collections.Generic.List[string]"
+foreach ($o in (@("http://localhost", "http://127.0.0.1") + $existing + @($publicUrl))) {
+    if (-not $origins.Contains($o)) {
+        $origins.Add($o) | Out-Null
     }
-    if (-not $filtered.Contains($publicUrl)) { $filtered.Add($publicUrl) }
+}
+
+if ($publicUrl -match "ngrok") {
+    $filtered = New-Object "System.Collections.Generic.List[string]"
+    foreach ($o in $origins) {
+        if ($o -eq $publicUrl -or $o -notmatch "ngrok") {
+            $filtered.Add($o) | Out-Null
+        }
+    }
+    if (-not $filtered.Contains($publicUrl)) {
+        $filtered.Add($publicUrl) | Out-Null
+    }
     $origins = $filtered
 }
 
 function Set-EnvKey([string[]]$content, [string]$key, [string]$value) {
     $found = $false
     $out = foreach ($line in $content) {
-        if ($line -match "^$([regex]::Escape($key))=") {
+        if ($line -match ("^" + [regex]::Escape($key) + "=")) {
             $found = $true
             "$key=$value"
         } else {
@@ -56,14 +63,14 @@ $corsValue = ($origins -join ",")
 $lines = Set-EnvKey $lines "CORS_ORIGINS" $corsValue
 $lines = Set-EnvKey $lines "FRONTEND_URL" $publicUrl
 $lines = Set-EnvKey $lines "BACKEND_URL" $publicUrl
-# UTF-8 without BOM (BOM breaks some env parsers)
+
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllLines((Join-Path (Get-Location) ".env"), $lines, $utf8NoBom)
 
-Write-Host "Updated .env CORS / FRONTEND_URL / BACKEND_URL → $publicUrl"
+Write-Host "Updated .env CORS / FRONTEND_URL / BACKEND_URL -> $publicUrl"
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    Write-Host "Updated .env, but docker was not found — start Docker Desktop, then run:"
+    Write-Host "Updated .env, but docker was not found - start Docker Desktop, then run:"
     Write-Host "  docker compose -f docker-compose.local.yml restart backend nginx"
     exit 0
 }

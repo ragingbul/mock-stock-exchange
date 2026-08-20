@@ -6,7 +6,7 @@ $RootDir = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 Set-Location $RootDir
 
 if (Test-Path ".env") {
-    Write-Host ".env already exists — leaving it unchanged."
+    Write-Host ".env already exists - leaving it unchanged."
     Write-Host "Edit CORS_ORIGINS / FRONTEND_URL / BACKEND_URL as needed."
     exit 0
 }
@@ -27,14 +27,16 @@ function Set-EnvKeyInFile([string]$key, [string]$value) {
     $lines = Get-Content ".env"
     $found = $false
     $out = foreach ($line in $lines) {
-        if ($line -match "^$([regex]::Escape($key))=") {
+        if ($line -match ("^" + [regex]::Escape($key) + "=")) {
             $found = $true
             "$key=$value"
         } else {
             $line
         }
     }
-    if (-not $found) { $out = @($out) + "$key=$value" }
+    if (-not $found) {
+        $out = @($out) + "$key=$value"
+    }
     $utf8NoBom = New-Object System.Text.UTF8Encoding $false
     [System.IO.File]::WriteAllLines((Join-Path (Get-Location) ".env"), $out, $utf8NoBom)
 }
@@ -52,4 +54,4 @@ Set-EnvKeyInFile "BACKEND_URL" "http://localhost"
 
 Write-Host "Created .env with generated POSTGRES_PASSWORD, JWT_SECRET, ADMIN_SECRET."
 Write-Host "ADMIN_SECRET=$admin"
-Write-Host "Save the admin secret — you need it for /admin."
+Write-Host "Save the admin secret - you need it for /admin."
