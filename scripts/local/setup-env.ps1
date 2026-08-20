@@ -35,7 +35,8 @@ function Set-EnvKeyInFile([string]$key, [string]$value) {
         }
     }
     if (-not $found) { $out = @($out) + "$key=$value" }
-    $out | Set-Content ".env" -Encoding utf8
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllLines((Join-Path (Get-Location) ".env"), $out, $utf8NoBom)
 }
 
 $pg = New-Secret 24
