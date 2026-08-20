@@ -135,6 +135,9 @@ def start_simulation(db: Session) -> dict:
     if state.status == SimulationStatus.NOT_STARTED:
         state.sim_elapsed_sec = 0.0
         state.last_ai_tick_elapsed_sec = -30.0
+        from app.services.simulation_engine import reset_market_pulse_clock
+
+        reset_market_pulse_clock(0.0)
 
     state.status = SimulationStatus.RUNNING
     state.clock_anchor_real = datetime.now(timezone.utc)
@@ -221,8 +224,10 @@ def reset_simulation(db: Session) -> dict:
         state.sim_duration_sec = float(sim_settings.sim_duration_sec or 10800)
 
         from app.services.simulation_settings_service import sync_runtime_speed_from_settings
+        from app.services.simulation_engine import reset_market_pulse_clock
 
         sync_runtime_speed_from_settings(db)
+        reset_market_pulse_clock(0.0)
 
         seed_timeline_from_json(db, force=True)
         bootstrap = bootstrap_universe(db)

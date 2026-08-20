@@ -8,19 +8,20 @@ import { StockSidebar, type SectorGroup, type SidebarStock } from "@/components/
 import { TradePanel } from "@/components/TradePanel";
 import { WalletBar } from "@/components/WalletBar";
 import { useMarketWebSocket } from "@/hooks/useMarketWebSocket";
-import { usePriceChart, type PriceUpdatePayload } from "@/hooks/usePriceChart";
+import {
+  usePriceChart,
+  type MarketPulseStock,
+  type PriceUpdatePayload,
+} from "@/hooks/usePriceChart";
 import { apiGet, apiPost, fetchSessionBootstrap, joinSession } from "@/lib/api";
+import {
+  markWalletToMarket,
+  type PortfolioSnapshot,
+  type WalletSnapshot,
+} from "@/lib/portfolioValuation";
 
-type Wallet = {
-  available_cash: string;
-  portfolio_value: string;
-  total_pnl: string;
-  return_pct: string;
-};
-
-type Portfolio = {
-  holdings: Array<{ ticker: string | null; quantity: number }>;
-};
+type Wallet = WalletSnapshot;
+type Portfolio = PortfolioSnapshot;
 
 type IPO = {
   id: number;
@@ -36,6 +37,23 @@ type SimulationState = {
   trading_enabled?: boolean;
 };
 
+function asMoney(v: unknown): string {
+  if (v == null) return "0";
+  return String(v);
+}
+
+function newsFromPayload(raw: Record<string, unknown> | undefined): NewsItem | null {
+  if (!raw) return null;
+  const title = String(raw.title ?? raw.headline ?? "").trim();
+  if (!title) return null;
+  return {
+    id: Number(raw.id ?? 0),
+    title,
+    description: String(raw.description ?? ""),
+    released_at: raw.released_at ? String(raw.released_at) : undefined,
+  };
+}
+
 export default function TerminalPage() {
   const [traderId, setTraderId] = useState<number | null>(null);
   const [traderName, setTraderName] = useState("Trader");
@@ -45,6 +63,7 @@ export default function TerminalPage() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [breaking, setBreaking] = useState<NewsItem | null>(null);
+  const [newsFeed, setNewsFeed] = useState<NewsItem[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
   const [showLb, setShowLb] = useState(false);
   const [ipos, setIpos] = useState<IPO[]>([]);
@@ -63,9 +82,14 @@ export default function TerminalPage() {
     [stocks, selectedId],
   );
 
-  const { priceSeries, chartLoading, handlePriceUpdate } = usePriceChart(
+  const { priceSeries, chartLoading, handlePriceUpdate, handleMarketPulse } = usePriceChart(
     selectedId,
     selected?.last_traded_price,
+  );
+
+  const displayWallet = useMemo(
+    () => markWalletToMarket(wallet, portfolio, stocks),
+    [wallet, portfolio, stocks],
   );
 
   const holdingQty = useMemo(() => {
@@ -78,19 +102,36 @@ export default function TerminalPage() {
     [stocks],
   );
 
-  const patchStockPrice = useCallback((stockId: number, ltp: string) => {
-    setStocks((prev) =>
-      prev.map((s) => (s.id === stockId ? { ...s, last_traded_price: ltp } : s)),
-    );
-    setSectors((prev) =>
-      prev.map((sector) => ({
-        ...sector,
-        stocks: sector.stocks.map((s) =>
-          s.stock_id === stockId ? { ...s, last_traded_price: ltp } : s,
+  const patchStockPrice = useCallback(
+    (stockId: number, ltp: string, percentChange?: string) => {
+      setStocks((prev) =>
+        prev.map((s) =>
+          s.id === stockId
+            ? {
+                ...s,
+                last_traded_price: ltp,
+                ...(percentChange != null ? { percent_change: percentChange } : {}),
+              }
+            : s,
         ),
-      })),
-    );
-  }, []);
+      );
+      setSectors((prev) =>
+        prev.map((sector) => ({
+          ...sector,
+          stocks: sector.stocks.map((s) =>
+            s.stock_id === stockId
+              ? {
+                  ...s,
+                  last_traded_price: ltp,
+                  ...(percentChange != null ? { percent_change: percentChange } : {}),
+                }
+              : s,
+          ),
+        })),
+      );
+    },
+    [],
+  );
 
   const applySimulationState = useCallback((sim: SimulationState | undefined) => {
     if (!sim) return;
@@ -99,6 +140,14 @@ export default function TerminalPage() {
     } else if (sim.status) {
       setTradingEnabled(sim.status === "running");
     }
+  }, []);
+
+  const showBreaking = useCallback((item: NewsItem) => {
+    setBreaking(item);
+    setNewsFeed((prev) => {
+      const without = prev.filter((n) => n.id !== item.id);
+      return [item, ...without].slice(0, 12);
+    });
   }, []);
 
   const refreshStocks = useCallback(async () => {
@@ -118,12 +167,31 @@ export default function TerminalPage() {
     (data: Awaited<ReturnType<typeof fetchSessionBootstrap>>) => {
       setTraderId(data.trader_id);
       setWallet({
-        available_cash: data.wallet.available_cash,
-        portfolio_value: data.wallet.portfolio_value,
-        total_pnl: data.wallet.total_pnl ?? "0",
-        return_pct: data.wallet.return_pct ?? "0",
+        available_cash: asMoney(data.wallet.available_cash),
+        portfolio_value: asMoney(data.wallet.portfolio_value),
+        total_pnl: asMoney(data.wallet.total_pnl ?? "0"),
+        return_pct: asMoney(data.wallet.return_pct ?? "0"),
+        starting_capital: data.wallet.starting_capital
+          ? asMoney(data.wallet.starting_capital)
+          : undefined,
       });
-      setPortfolio(data.portfolio);
+      setPortfolio({
+        holdings: (data.portfolio.holdings ?? []).map((h) => ({
+          ticker: h.ticker,
+          quantity: h.quantity,
+          avg_cost: h.avg_cost != null ? asMoney(h.avg_cost) : undefined,
+        })),
+        starting_capital:
+          data.portfolio.starting_capital != null
+            ? asMoney(data.portfolio.starting_capital)
+            : undefined,
+        realized_pnl:
+          data.portfolio.realized_pnl != null ? asMoney(data.portfolio.realized_pnl) : undefined,
+        cash_blocked_ipo:
+          data.portfolio.cash_blocked_ipo != null
+            ? asMoney(data.portfolio.cash_blocked_ipo)
+            : undefined,
+      });
       applySimulationState(data.simulation as SimulationState);
       if (data.stocks?.length) {
         setStocks(
@@ -143,6 +211,16 @@ export default function TerminalPage() {
       if (data.sectors?.length) setSectors(data.sectors);
       if (data.leaderboard?.length) setLeaderboard(data.leaderboard);
       if (data.open_ipos?.length) setIpos(data.open_ipos);
+      if (data.released_news?.length) {
+        const items = data.released_news.map((n) => ({
+          id: n.id,
+          title: n.title,
+          description: n.description ?? "",
+          released_at: n.released_at,
+        }));
+        setNewsFeed(items);
+        setBreaking((prev) => prev ?? items[0]);
+      }
     },
     [selectedId, applySimulationState],
   );
@@ -154,20 +232,49 @@ export default function TerminalPage() {
       const data = await fetchSessionBootstrap();
       applyBootstrap(data);
     } catch {
-      /* token may be stale; user can re-join */
+      localStorage.removeItem("mse_access_token");
+      localStorage.removeItem("mse_trader_id");
+      setTraderId(null);
+      setWallet(null);
+      setPortfolio(null);
     }
   }, [applyBootstrap]);
 
-  const refreshWallet = useCallback(async () => {
-    if (!traderId) return;
-    const [w, p, lb] = await Promise.all([
-      apiGet<Wallet>(`/traders/${traderId}/wallet`),
-      apiGet<Portfolio>(`/traders/${traderId}/portfolio`),
-      apiGet<LeaderboardRow[]>("/leaderboard"),
-    ]);
-    setWallet(w);
-    setPortfolio(p);
-    setLeaderboard(lb);
+  const refreshWallet = useCallback(async (explicitTraderId?: number) => {
+    const id = explicitTraderId ?? traderId;
+    if (!id) return;
+    try {
+      const [w, p, lb] = await Promise.all([
+        apiGet<Wallet>(`/traders/${id}/wallet`),
+        apiGet<Portfolio>(`/traders/${id}/portfolio`),
+        apiGet<LeaderboardRow[]>("/leaderboard"),
+      ]);
+      setWallet({
+        available_cash: asMoney(w.available_cash),
+        portfolio_value: asMoney(w.portfolio_value),
+        total_pnl: asMoney(w.total_pnl ?? "0"),
+        return_pct: asMoney(w.return_pct ?? "0"),
+        starting_capital: w.starting_capital ? asMoney(w.starting_capital) : undefined,
+      });
+      setPortfolio({
+        holdings: (p.holdings ?? []).map((h) => ({
+          ticker: h.ticker,
+          quantity: h.quantity,
+          avg_cost: h.avg_cost != null ? asMoney(h.avg_cost) : undefined,
+        })),
+        starting_capital: p.starting_capital != null ? asMoney(p.starting_capital) : undefined,
+        realized_pnl: p.realized_pnl != null ? asMoney(p.realized_pnl) : undefined,
+        cash_blocked_ipo: p.cash_blocked_ipo != null ? asMoney(p.cash_blocked_ipo) : undefined,
+      });
+      setLeaderboard(lb);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "";
+      if (message.toLowerCase().includes("401") || message.toLowerCase().includes("unauthor")) {
+        localStorage.removeItem("mse_access_token");
+        localStorage.removeItem("mse_trader_id");
+        setTraderId(null);
+      }
+    }
   }, [traderId]);
 
   const refresh = useCallback(async () => {
@@ -176,7 +283,18 @@ export default function TerminalPage() {
       await refreshSectors();
       const openIpos = await apiGet<IPO[]>("/ipos/open").catch(() => [] as IPO[]);
       setIpos(openIpos);
-      if (traderId) await refreshWallet();
+      if (traderId) await refreshWallet(traderId);
+      const news = await apiGet<NewsItem[]>("/news").catch(() => [] as NewsItem[]);
+      if (news.length) {
+        setNewsFeed(
+          news.slice(0, 12).map((n) => ({
+            id: n.id,
+            title: n.title,
+            description: n.description ?? "",
+            released_at: n.released_at,
+          })),
+        );
+      }
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load data");
@@ -196,6 +314,12 @@ export default function TerminalPage() {
     }
   }, [resyncBootstrap]);
 
+  useEffect(() => {
+    if (!breaking) return;
+    const id = window.setTimeout(() => setBreaking(null), 20_000);
+    return () => window.clearTimeout(id);
+  }, [breaking]);
+
   const { connected, reconnecting } = useMarketWebSocket({
     onOpen: () => setWsStatus("LIVE"),
     onClose: () => setWsStatus("Reconnecting"),
@@ -205,28 +329,30 @@ export default function TerminalPage() {
     },
     onMessage: (msg) => {
       if (msg.event === "NEWS_RELEASED") {
-        const payload = msg.payload as NewsItem | undefined;
-        if (payload?.title) {
-          setBreaking({
-            id: payload.id ?? 0,
-            title: payload.title,
-            description: payload.description ?? "",
-            released_at: payload.released_at,
-          });
-        }
+        const raw = (msg.payload ?? msg) as Record<string, unknown>;
+        const item = newsFromPayload(raw);
+        if (item) showBreaking(item);
       }
       if (msg.event === "SIMULATION_CLOCK" || msg.event === "SIMULATION_STATUS") {
         applySimulationState((msg.payload ?? msg) as SimulationState);
       }
+      if (msg.event === "MARKET_PULSE") {
+        const payload = (msg.payload ?? msg) as { stocks?: MarketPulseStock[] };
+        const rows = payload.stocks ?? [];
+        handleMarketPulse(rows);
+        for (const row of rows) {
+          patchStockPrice(row.stock_id, row.ltp, row.percent_change);
+        }
+      }
       if (msg.event === "PRICE_UPDATED") {
-        const payload = (msg.payload ?? msg) as PriceUpdatePayload;
+        const payload = (msg.payload ?? msg) as PriceUpdatePayload & { percent_change?: string };
         handlePriceUpdate(payload);
         const stockId = payload.stock_id;
         if (stockId) {
           const ltp =
             payload.ltp ??
             (payload.trades?.length ? payload.trades[payload.trades.length - 1].price : undefined);
-          if (ltp) patchStockPrice(stockId, ltp);
+          if (ltp) patchStockPrice(stockId, ltp, payload.percent_change);
         }
       }
       if (msg.event === "TRADE_EXECUTED") {
@@ -266,6 +392,7 @@ export default function TerminalPage() {
       const created = await joinSession(traderName || "Trader");
       setTraderId(created.trader_id);
       await resyncBootstrap();
+      await refreshWallet(created.trader_id);
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not join session");
@@ -304,7 +431,7 @@ export default function TerminalPage() {
       }
       setToast(res.execution_summary?.message ?? `${confirmSide.toUpperCase()} order placed`);
       setConfirmSide(null);
-      await refreshWallet();
+      await refreshWallet(traderId);
     } catch (e) {
       setConfirmError(e instanceof Error ? e.message : "Order failed");
     } finally {
@@ -317,13 +444,14 @@ export default function TerminalPage() {
     try {
       await apiPost(`/ipos/${ipos[0].id}/apply`, { trader_id: traderId, requested_lots: ipoLots });
       setToast("IPO applied");
-      await refreshWallet();
+      await refreshWallet(traderId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "IPO failed");
     }
   }
 
   const inputCls = "w-full border border-white/25 bg-black px-2 py-2 text-white outline-none";
+  const latestNews = newsFeed[0] ?? breaking;
 
   if (!traderId) {
     return (
@@ -344,21 +472,36 @@ export default function TerminalPage() {
   return (
     <div className="flex min-h-screen flex-col bg-black font-mono text-sm text-white">
       <WalletBar
-        cash={wallet?.available_cash}
-        portfolio={wallet?.portfolio_value}
-        pnl={wallet?.total_pnl}
-        ret={wallet?.return_pct}
+        cash={displayWallet?.available_cash}
+        portfolio={displayWallet?.portfolio_value}
+        pnl={displayWallet?.total_pnl}
+        ret={displayWallet?.return_pct}
         onLeaderboard={() => setShowLb((v) => !v)}
         showLeaderboard={showLb}
       />
-      <p className="border-x border-white/15 px-4 py-1 text-[10px] text-white/40">
-        {wsStatus}
-        {!connected && wsStatus === "OFF" ? " · fallback poll 12s" : ""}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-3 py-1.5 text-[10px] text-white/40 sm:px-4">
+        <span>
+          {wsStatus}
+          {!connected && wsStatus === "OFF" ? " · fallback poll 12s" : ""}
+        </span>
+        <span className={tradingEnabled ? "text-[#22c55e]" : "text-yellow-400"}>
+          {tradingEnabled ? "MARKET OPEN" : "MARKET CLOSED"}
+        </span>
+      </div>
+
+      {latestNews && (
+        <div className="border-b border-[#ef4444]/40 bg-[#ef4444]/10 px-3 py-2 sm:px-4">
+          <p className="text-[10px] uppercase tracking-wider text-[#ef4444]">Latest news</p>
+          <p className="mt-1 text-sm leading-snug">{latestNews.title}</p>
+          {latestNews.description && (
+            <p className="mt-1 line-clamp-2 text-xs text-white/60">{latestNews.description}</p>
+          )}
+        </div>
+      )}
 
       <BreakingNewsAlert news={breaking} onDismiss={() => setBreaking(null)} />
 
-      <div className="grid flex-1 grid-cols-1 gap-0 lg:grid-cols-[240px_1fr]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-[220px_1fr] xl:grid-cols-[260px_1fr]">
         <StockSidebar
           sectors={sectors}
           dissolved={dissolvedStocks}

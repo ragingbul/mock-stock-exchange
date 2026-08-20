@@ -81,7 +81,7 @@ async function parseError(res: Response): Promise<string> {
   const text = await res.text();
   try {
     const json = JSON.parse(text);
-    if (json.detail) return String(json.detail);
+    if (json.detail) return `${res.status} ${String(json.detail)}`;
   } catch {
     /* use raw text */
   }
@@ -165,10 +165,14 @@ type Wallet = {
   portfolio_value: string;
   total_pnl: string;
   return_pct: string;
+  starting_capital?: string;
 };
 
 type Portfolio = {
-  holdings: Array<{ ticker: string | null; quantity: number }>;
+  holdings: Array<{ ticker: string | null; quantity: number; avg_cost?: string }>;
+  starting_capital?: string;
+  realized_pnl?: string;
+  cash_blocked_ipo?: string;
 };
 
 type SidebarStock = {

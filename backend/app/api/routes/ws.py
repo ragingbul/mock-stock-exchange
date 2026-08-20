@@ -15,10 +15,14 @@ async def websocket_endpoint(
 ) -> None:
     trader_id: int | None = None
     if token:
-        payload = decode_token(token)
-        raw_id = payload.get("trader_id")
-        if raw_id is not None:
-            trader_id = int(raw_id)
+        try:
+            payload = decode_token(token)
+            raw_id = payload.get("trader_id")
+            if raw_id is not None:
+                trader_id = int(raw_id)
+        except Exception:
+            # Stale/invalid token must not block the public market feed.
+            trader_id = None
 
     await manager.connect(websocket, trader_id=trader_id)
     try:

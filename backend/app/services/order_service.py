@@ -1,4 +1,11 @@
-"""Order gateway: validate → persist → match → settle."""
+"""Order gateway: validate → price at LTP → direct fill (no order book).
+
+Layers:
+  1. Validate trader / stock / session / cash / holdings
+  2. Lock execution price to current last traded price
+  3. Fill immediately against the exchange house account
+  4. Commit
+"""
 
 from __future__ import annotations
 
@@ -8,22 +15,21 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.exchange.book_registry import books
-from app.exchange.matching_engine import MatchingEngine
+from app.exchange.matching_engine import MatchFill
 from app.exchange.settlement import SettlementError, settle_fill
 from app.models import Holding, Order, OrderSide, OrderStatus, OrderType, Stock, Trade, Trader
-from app.models.enums import MarketSessionStatus
+from app.models.enums import MarketSessionStatus, TraderType
 from app.models.market_session import MarketSession
-from app.services import liquidity_service
+
+EXCHANGE_NAME = "EXCHANGE"
+EXCHANGE_CASH = Decimal("999999999999.00")
+EXCHANGE_SHARES = 1_000_000_000
 
 
 class OrderGatewayError(Exception):
     def __init__(self, message: str, *, rejected_order: Order | None = None) -> None:
         super().__init__(message)
         self.rejected_order = rejected_order
-
-
-engine = MatchingEngine()
 
 
 def _quantize_price(price: Decimal, tick: Decimal) -> Decimal:
@@ -44,6 +50,46 @@ def _holding_qty(db: Session, trader_id: int, stock_id: int) -> int:
     return h.quantity if h else 0
 
 
+def _get_or_create_holding(db: Session, trader_id: int, stock_id: int) -> Holding:
+    holding = db.scalar(
+        select(Holding).where(Holding.trader_id == trader_id, Holding.stock_id == stock_id)
+    )
+    if holding is None:
+        holding = Holding(
+            trader_id=trader_id,
+            stock_id=stock_id,
+            quantity=0,
+            avg_cost=Decimal("0"),
+        )
+        db.add(holding)
+        db.flush()
+    return holding
+
+
+def _get_or_create_exchange(db: Session, stock_id: int) -> Trader:
+    """Infinite counterparty for direct fills — never rests on a book."""
+    exchange = db.scalar(select(Trader).where(Trader.name == EXCHANGE_NAME).limit(1))
+    if exchange is None:
+        exchange = Trader(
+            name=EXCHANGE_NAME,
+            trader_type=TraderType.AI,
+            starting_capital=EXCHANGE_CASH,
+            cash=EXCHANGE_CASH,
+            cash_blocked_ipo=Decimal("0"),
+            realized_pnl=Decimal("0"),
+            is_active=True,
+        )
+        db.add(exchange)
+        db.flush()
+
+    exchange.cash = max(Decimal(exchange.cash), EXCHANGE_CASH)
+    exchange.is_active = True
+    holding = _get_or_create_holding(db, exchange.id, stock_id)
+    if holding.quantity < EXCHANGE_SHARES:
+        holding.quantity = EXCHANGE_SHARES
+    return exchange
+
+
 def submit_order(
     db: Session,
     *,
@@ -61,8 +107,8 @@ def submit_order(
 
     def reject(reason: str) -> Order:
         order = Order(
-            trader_id=trader_id if trader else trader_id,
-            stock_id=stock_id if stock else stock_id,
+            trader_id=trader_id,
+            stock_id=stock_id,
             side=side,
             order_type=order_type,
             quantity=max(quantity, 0),
@@ -78,6 +124,7 @@ def submit_order(
             db.refresh(order)
         return order
 
+    # --- Layer 1: validate ---
     if trader is None or not trader.is_active:
         raise OrderGatewayError("trader not found or inactive")
     if stock is None:
@@ -85,9 +132,6 @@ def submit_order(
     if quantity <= 0:
         order = reject("quantity must be positive")
         raise OrderGatewayError("quantity must be positive", rejected_order=order)
-    if order_type == OrderType.LIMIT and (price is None or price <= 0):
-        order = reject("limit order requires positive price")
-        raise OrderGatewayError("limit order requires positive price", rejected_order=order)
 
     session = _active_session(db)
     from app.models.enums import SimulationStatus, StockStatus
@@ -107,26 +151,17 @@ def submit_order(
         order = reject("stock is closed or halted")
         raise OrderGatewayError("stock is closed or halted", rejected_order=order)
 
-    circuit = Decimal(str(settings.default_circuit_pct))
-    ref = Decimal(stock.previous_close)
-    if order_type == OrderType.LIMIT and price is not None and ref > 0:
-        upper = ref * (Decimal("1") + circuit)
-        lower = ref * (Decimal("1") - circuit)
-        if price > upper or price < lower:
-            order = reject("price outside circuit limits")
-            raise OrderGatewayError("price outside circuit limits", rejected_order=order)
-
-    if order_type == OrderType.LIMIT and price is not None:
-        price = _quantize_price(price, Decimal(stock.tick_size))
+    # --- Layer 2: execution price (always LTP; ignore book / opposing quotes) ---
+    exec_price = Decimal(stock.last_traded_price)
+    if exec_price <= 0:
+        exec_price = Decimal(stock.starting_price)
+    exec_price = _quantize_price(exec_price, Decimal(stock.tick_size or "0.05"))
+    if exec_price <= 0:
+        order = reject("invalid market price")
+        raise OrderGatewayError("invalid market price", rejected_order=order)
 
     if side == OrderSide.BUY:
-        book = books.get(stock_id)
-        if order_type == OrderType.MARKET:
-            best_ask = book.best_ask()
-            est_price = best_ask.price if best_ask else Decimal(stock.last_traded_price)
-        else:
-            est_price = price if order_type == OrderType.LIMIT else Decimal(stock.last_traded_price)
-        if est_price and trader.cash < est_price * quantity:
+        if trader.cash < exec_price * quantity:
             order = reject("insufficient cash")
             raise OrderGatewayError("insufficient cash", rejected_order=order)
     else:
@@ -136,73 +171,76 @@ def submit_order(
                 "insufficient holdings (short selling disabled)", rejected_order=order
             )
 
-    if order_type == OrderType.MARKET:
-        liquidity_service.ensure_liquidity_for_market_order(
-            db, stock, side, trader_id, quantity
-        )
+    # --- Layer 3: direct fill vs exchange house ---
+    exchange = _get_or_create_exchange(db, stock_id)
 
-    order = Order(
+    user_order = Order(
         trader_id=trader_id,
         stock_id=stock_id,
         side=side,
-        order_type=order_type,
+        order_type=OrderType.MARKET,
         quantity=quantity,
         remaining_quantity=quantity,
-        price=price,
+        price=None,
         status=OrderStatus.OPEN,
         client_order_id=client_order_id,
     )
-    db.add(order)
+    db.add(user_order)
     db.flush()
 
-    book = books.get(stock_id)
-    result = engine.match(
-        book,
-        order_id=order.id,
-        trader_id=trader_id,
-        side=side,
-        order_type=order_type,
+    counter_side = OrderSide.SELL if side == OrderSide.BUY else OrderSide.BUY
+    house_order = Order(
+        trader_id=exchange.id,
+        stock_id=stock_id,
+        side=counter_side,
+        order_type=OrderType.MARKET,
         quantity=quantity,
-        limit_price=price,
+        remaining_quantity=quantity,
+        price=None,
+        status=OrderStatus.OPEN,
+        client_order_id=f"house-{user_order.id}",
     )
+    db.add(house_order)
+    db.flush()
+
+    if side == OrderSide.BUY:
+        fill = MatchFill(
+            buy_order_id=user_order.id,
+            sell_order_id=house_order.id,
+            buyer_id=trader_id,
+            seller_id=exchange.id,
+            price=exec_price,
+            quantity=quantity,
+        )
+    else:
+        fill = MatchFill(
+            buy_order_id=house_order.id,
+            sell_order_id=user_order.id,
+            buyer_id=exchange.id,
+            seller_id=trader_id,
+            price=exec_price,
+            quantity=quantity,
+        )
 
     trades: list[Trade] = []
     try:
-        for fill in result.fills:
-            trades.append(settle_fill(db, stock_id, fill))
+        trades.append(settle_fill(db, stock_id, fill))
     except SettlementError as exc:
         db.rollback()
-        books.get(stock_id).remove_order(order.id)
         raise OrderGatewayError(f"settlement failed: {exc}") from exc
 
-    filled_qty = sum(t.quantity for t in trades)
+    user_order.remaining_quantity = 0
+    user_order.status = OrderStatus.FILLED
+    house_order.remaining_quantity = 0
+    house_order.status = OrderStatus.FILLED
 
-    if order_type == OrderType.MARKET:
-        # Market leftovers are never booked.
-        order.remaining_quantity = 0
-        if filled_qty == 0:
-            order.status = OrderStatus.CANCELLED
-            order.reject_reason = "no liquidity"
-        elif filled_qty < order.quantity:
-            order.status = OrderStatus.PARTIALLY_FILLED
-        else:
-            order.status = OrderStatus.FILLED
-    else:
-        order.remaining_quantity = result.remaining_quantity
-        if filled_qty == 0 and result.resting:
-            order.status = OrderStatus.OPEN
-        elif result.remaining_quantity == 0:
-            order.status = OrderStatus.FILLED
-        else:
-            order.status = OrderStatus.PARTIALLY_FILLED
-
+    # --- Layer 4: commit ---
     db.commit()
-    db.refresh(order)
+    db.refresh(user_order)
     for t in trades:
         db.refresh(t)
 
-    # After sells, shrink/cancel stop-loss & take-profit tied to this position
-    if side == OrderSide.SELL and filled_qty > 0:
+    if side == OrderSide.SELL:
         try:
             from app.services import conditional_order_service
 
@@ -210,7 +248,8 @@ def submit_order(
         except Exception:
             pass
 
-    return order, trades
+    _ = settings  # circuit settings retained for future knobs
+    return user_order, trades
 
 
 def cancel_order(db: Session, order_id: int, trader_id: int | None = None) -> Order:
@@ -222,7 +261,6 @@ def cancel_order(db: Session, order_id: int, trader_id: int | None = None) -> Or
     if order.status not in {OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED}:
         raise OrderGatewayError(f"cannot cancel order in status {order.status.value}")
 
-    books.get(order.stock_id).remove_order(order.id)
     order.status = OrderStatus.CANCELLED
     order.remaining_quantity = 0
     db.commit()

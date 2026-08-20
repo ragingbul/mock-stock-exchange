@@ -71,26 +71,33 @@ export function TradePanel({
 
   const estimatedValue = stock ? qty * num(stock.last_traded_price) : 0;
   const canTrade = tradingEnabled && !!stock;
-  const inputCls = "w-full border border-white/25 bg-black px-2 py-2 text-white outline-none focus:border-white";
+  const inputCls =
+    "w-full border border-white/25 bg-black px-3 py-2.5 text-white outline-none focus:border-white";
 
   return (
-    <main className="flex flex-col border border-white/15 bg-black p-4">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-xl">{stock?.company_name ?? "Select a stock"}</h1>
+    <main className="flex min-h-0 flex-1 flex-col border border-white/15 bg-black p-3 sm:p-4">
+      {/* Layer 1 — quote header */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="truncate text-lg sm:text-xl">{stock?.company_name ?? "Select a stock"}</h1>
           <p className="text-xs text-white/50">{stock?.ticker ?? "—"}</p>
         </div>
         <div className="text-right">
-          <p className="text-3xl tabular-nums">{stock ? num(stock.last_traded_price).toFixed(2) : "—"}</p>
+          <p className="text-2xl tabular-nums sm:text-3xl">
+            {stock ? num(stock.last_traded_price).toFixed(2) : "—"}
+          </p>
           <p className={`text-sm ${signClass(stock?.percent_change)}`}>
             {stock ? fmtPct(stock.percent_change) : "—"}
           </p>
         </div>
       </div>
 
-      <div className="relative mt-4 h-72 border border-white/10 p-2 lg:h-96">
+      {/* Layer 2 — chart */}
+      <div className="relative mt-3 h-56 border border-white/10 p-2 sm:h-72 lg:h-96">
         {chartLoading && priceSeries.length === 0 && (
-          <p className="absolute inset-0 flex items-center justify-center text-xs text-white/30">Loading chart…</p>
+          <p className="absolute inset-0 flex items-center justify-center text-xs text-white/30">
+            Loading chart…
+          </p>
         )}
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={priceSeries}>
@@ -115,46 +122,49 @@ export function TradePanel({
         </p>
       )}
 
-      <div className="mt-4 max-w-xs">
-        <label className="text-[10px] text-white/40">Quantity</label>
-        <input
-          type="number"
-          min={1}
-          className={`${inputCls} mt-1`}
-          value={qty}
-          onChange={(e) => onQtyChange(Number(e.target.value))}
-        />
-        <p className="mt-1 text-[10px] text-white/40">Holding: {holdingQty}</p>
-      </div>
+      {/* Layer 3 — trade controls */}
+      <div className="mt-4 grid gap-3 sm:max-w-md">
+        <div>
+          <label className="text-[10px] uppercase tracking-wider text-white/40">Quantity</label>
+          <input
+            type="number"
+            min={1}
+            className={`${inputCls} mt-1`}
+            value={qty}
+            onChange={(e) => onQtyChange(Number(e.target.value))}
+          />
+          <p className="mt-1 text-[10px] text-white/40">Holding: {holdingQty}</p>
+        </div>
 
-      <div className="mt-4 grid max-w-md grid-cols-2 gap-2">
-        <button
-          type="button"
-          disabled={!canTrade}
-          title={!tradingEnabled ? "Wait for admin to start simulation" : undefined}
-          className="bg-[#22c55e] py-3 text-black disabled:opacity-40"
-          onClick={onBuy}
-        >
-          BUY
-        </button>
-        <button
-          type="button"
-          disabled={!canTrade}
-          title={!tradingEnabled ? "Wait for admin to start simulation" : undefined}
-          className="bg-[#ef4444] py-3 text-black disabled:opacity-40"
-          onClick={onSell}
-        >
-          SELL
-        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            disabled={!canTrade}
+            title={!tradingEnabled ? "Wait for admin to start simulation" : undefined}
+            className="bg-[#22c55e] py-3.5 text-base font-semibold text-black disabled:opacity-40 sm:py-4"
+            onClick={onBuy}
+          >
+            BUY
+          </button>
+          <button
+            type="button"
+            disabled={!canTrade}
+            title={!tradingEnabled ? "Wait for admin to start simulation" : undefined}
+            className="bg-[#ef4444] py-3.5 text-base font-semibold text-black disabled:opacity-40 sm:py-4"
+            onClick={onSell}
+          >
+            SELL
+          </button>
+        </div>
       </div>
 
       {ipo && onIpoApply && (
-        <div className="mt-4 border border-white/15 p-3 text-xs">
+        <div className="mt-4 border border-white/15 p-3 text-xs sm:max-w-md">
           <p className="text-[#22c55e]">NEW IPO</p>
           <p className="mt-1">
             {ipo.company_name} ({ipo.ticker}) · ₹{ipo.issue_price} · lot {ipo.lot_size}
           </p>
-          <div className="mt-2 flex gap-2">
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
             <input
               type="number"
               min={1}
@@ -163,28 +173,30 @@ export function TradePanel({
               value={ipoLots}
               onChange={(e) => onIpoLotsChange(Number(e.target.value))}
             />
-            <button type="button" className="border border-white/30 px-4" onClick={onIpoApply}>
+            <button type="button" className="border border-white/30 px-4 py-2" onClick={onIpoApply}>
               APPLY
             </button>
           </div>
         </div>
       )}
 
+      {/* Layer 4 — confirm sheet */}
       {confirmSide && stock && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
-          <div className="w-full max-w-sm border border-white/25 bg-black p-4">
-            <p className="text-xs text-white/40">Confirm order</p>
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/20 bg-black p-4 sm:inset-0 sm:flex sm:items-center sm:justify-center sm:border-0 sm:bg-black/90">
+          <div className="mx-auto w-full max-w-sm border border-white/25 bg-black p-4">
+            <p className="text-xs uppercase tracking-wider text-white/40">Confirm</p>
             <p className="mt-2 text-lg">
               {confirmSide === "buy" ? "Buy" : "Sell"} {qty} × {stock.ticker}
             </p>
             <p className="mt-1 text-sm text-white/50">
-              Est. value ₹{estimatedValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              @ ₹{num(stock.last_traded_price).toFixed(2)} · Est. ₹
+              {estimatedValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
             </p>
             {confirmError && <p className="mt-2 text-xs text-[#ef4444]">{confirmError}</p>}
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
-                className="flex-1 border border-white/25 py-2"
+                className="flex-1 border border-white/25 py-3"
                 disabled={confirmLoading}
                 onClick={onCancelConfirm}
               >
@@ -192,11 +204,11 @@ export function TradePanel({
               </button>
               <button
                 type="button"
-                className={`flex-1 py-2 text-black ${confirmSide === "buy" ? "bg-[#22c55e]" : "bg-[#ef4444]"}`}
+                className={`flex-1 py-3 text-black ${confirmSide === "buy" ? "bg-[#22c55e]" : "bg-[#ef4444]"}`}
                 disabled={confirmLoading}
                 onClick={onConfirm}
               >
-                {confirmLoading ? "Submitting…" : "Confirm"}
+                {confirmLoading ? "Working…" : "Confirm"}
               </button>
             </div>
           </div>
