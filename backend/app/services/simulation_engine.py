@@ -15,6 +15,7 @@ from app.models import Stock
 from app.models.enums import SimulationStatus
 from app.realtime.ws_manager import manager
 from app.services.event_processor import process_due_events
+from app.services.market_pulse_service import run_market_pulse
 from app.services.simulation_clock import advance_clock, get_or_create_state, status_dict
 from app.services.simulation_settings_service import get_or_create_settings
 
@@ -25,8 +26,19 @@ _stop = asyncio.Event()
 _lock_conn: Connection | None = None
 AI_TICK_INTERVAL_SEC = 30.0
 CLOCK_BROADCAST_INTERVAL = 10.0
+MARKET_PULSE_INTERVAL_REAL = 1.0
 _last_clock_broadcast = 0.0
+_last_market_pulse_real = 0.0
+_market_pulse_seq = 0
 ADVISORY_LOCK_ID = 8675309
+
+
+def reset_market_pulse_clock(sim_elapsed: float = 0.0) -> None:
+    """Force the next pulse on the following engine tick after start/reset."""
+    global _last_market_pulse_real, _market_pulse_seq
+    _last_market_pulse_real = 0.0
+    _market_pulse_seq = 0
+    _ = sim_elapsed
 
 
 def _run_ai_tick(db, elapsed: float) -> list[dict]:
@@ -149,7 +161,7 @@ def _release_advisory_lock() -> None:
 
 
 async def _loop() -> None:
-    global _last_clock_broadcast
+    global _last_clock_broadcast, _last_market_pulse_real, _market_pulse_seq
     if not _acquire_advisory_lock():
         return
 
@@ -157,7 +169,7 @@ async def _loop() -> None:
     logger.info("Simulation engine loop started")
     try:
         while not _stop.is_set():
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.25)
             now_real = asyncio.get_event_loop().time()
             delta = now_real - last_real
             last_real = now_real
@@ -221,6 +233,21 @@ async def _loop() -> None:
                     if not completed and elapsed - _last_clock_broadcast >= CLOCK_BROADCAST_INTERVAL:
                         _last_clock_broadcast = elapsed
                         pending_broadcasts.append(("SIMULATION_CLOCK", status_dict(db)))
+
+                    if (
+                        not completed
+                        and state.status == SimulationStatus.RUNNING
+                        and now_real - _last_market_pulse_real >= MARKET_PULSE_INTERVAL_REAL
+                    ):
+                        _last_market_pulse_real = now_real
+                        _market_pulse_seq += 1
+                        pulse_updates = run_market_pulse(
+                            db, float(state.sim_elapsed_sec), pulse_seq=_market_pulse_seq
+                        )
+                        if pulse_updates:
+                            pending_broadcasts.append(
+                                ("MARKET_PULSE", {"stocks": pulse_updates, "elapsed_sec": elapsed})
+                            )
 
             except Exception:  # noqa: BLE001
                 logger.exception("Simulation engine tick failed")
