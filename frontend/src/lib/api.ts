@@ -4,9 +4,18 @@ import type { LeaderboardRow } from "@/components/Leaderboard";
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
 const REQUEST_TIMEOUT_MS = 30_000;
 
+function isNgrokHost(hostname: string): boolean {
+  return (
+    hostname.endsWith(".ngrok-free.dev") ||
+    hostname.endsWith(".ngrok-free.app") ||
+    hostname.endsWith(".ngrok.app") ||
+    hostname.endsWith(".ngrok.io")
+  );
+}
+
 function defaultHeaders(): HeadersInit {
   const headers: Record<string, string> = {};
-  if (typeof window !== "undefined" && window.location.hostname.endsWith(".ngrok-free.dev")) {
+  if (typeof window !== "undefined" && isNgrokHost(window.location.hostname)) {
     headers["ngrok-skip-browser-warning"] = "1";
   }
   return headers;
@@ -39,7 +48,10 @@ export function apiUrl(path: string): string {
 
 export function wsUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_WS_URL?.replace(/\/$/, "");
-  const base = explicit ?? getApiBaseUrl().replace(/^http/, "ws");
+  // Map https→wss and http→ws explicitly (avoid fragile string replace).
+  const base =
+    explicit ??
+    getApiBaseUrl().replace(/^https:/i, "wss:").replace(/^http:/i, "ws:");
   const path = `${base}${API_PREFIX}/ws`;
   if (typeof window === "undefined") return path;
   const token = window.localStorage.getItem("mse_access_token");
