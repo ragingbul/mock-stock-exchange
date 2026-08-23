@@ -37,6 +37,12 @@ See also [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) and [DEPLOYMENT.md](
 | Local dev stack | [`docker-compose.yml`](docker-compose.yml) |
 | Nginx | [`nginx/conf.d/tradeverse.conf`](nginx/conf.d/tradeverse.conf) |
 | Deploy script | [`scripts/oci/deploy.sh`](scripts/oci/deploy.sh) |
+| VM bootstrap (one-time) | [`scripts/oci/bootstrap-vm.sh`](scripts/oci/bootstrap-vm.sh) |
+| Env generator | [`scripts/oci/configure-env.sh`](scripts/oci/configure-env.sh) |
+| sslip.io hostname helper | [`scripts/oci/sslip-hostname.sh`](scripts/oci/sslip-hostname.sh) |
+| Let's Encrypt (recommended) | [`scripts/oci/setup-letsencrypt.sh`](scripts/oci/setup-letsencrypt.sh) |
+| Post-deploy verify | [`scripts/oci/verify-deployment.sh`](scripts/oci/verify-deployment.sh) |
+| Oracle MCP (local Cursor) | [`.cursor/mcp.json`](.cursor/mcp.json) |
 
 **Single simulation worker:** exactly one backend container, `uvicorn --workers 1`, PostgreSQL advisory lock fail-closed. Do not scale backend replicas.
 
@@ -64,6 +70,8 @@ Let's Encrypt **cannot** issue certificates for bare IP addresses.
 **Zero-cost alternative (optional):** use a free DNS name pointing at your IP (e.g. `203-0-113-10.sslip.io`) and Certbot. No domain purchase required. Documented in [HTTPS](#https) below.
 
 ---
+
+See [scripts/oci/OCI_CONSOLE_CHECKLIST.md](scripts/oci/OCI_CONSOLE_CHECKLIST.md) for Oracle Console steps (VM, firewall, SSH).
 
 ## Oracle VM setup (you run these steps)
 
@@ -97,6 +105,14 @@ Use SSH keys only. Disable password login in `/etc/ssh/sshd_config` if not alrea
 
 ### 4. Install Docker
 
+Run the all-in-one bootstrap (recommended):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ragingbul/mock-stock-exchange/main/scripts/oci/bootstrap-vm.sh | bash
+```
+
+Or manually:
+
 ```bash
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y ca-certificates curl git openssl ufw
@@ -106,6 +122,8 @@ newgrp docker
 ```
 
 ### 5. Host firewall (ufw)
+
+Skip if you used `bootstrap-vm.sh` (already configured).
 
 ```bash
 sudo ufw allow OpenSSH
@@ -126,7 +144,15 @@ cp .env.example .env
 
 ### 7. Configure `.env`
 
-Edit `.env` on the server (never commit). Replace `YOUR_PUBLIC_IP` and generate strong secrets:
+Auto-generate production secrets and URLs (recommended for sslip.io):
+
+```bash
+cd ~/tradeverse
+./scripts/oci/configure-env.sh YOUR_PUBLIC_IP
+# writes .env with https://YOUR-IP.sslip.io URLs
+```
+
+Or edit `.env` manually. Replace hostname and generate strong secrets:
 
 ```bash
 ENVIRONMENT=production
@@ -154,25 +180,29 @@ Production event: `SIMULATION_SPEED=1`. Rehearsal: temporarily set `SIMULATION_S
 
 ### 8. TLS certificate
 
-**IP-only (default):**
+**Recommended — sslip.io + Let's Encrypt (no browser warnings for 50 participants):**
+
+```bash
+./scripts/oci/setup-letsencrypt.sh YOUR_PUBLIC_IP
+# obtains cert for YOUR-IP.sslip.io and copies to nginx/certs/
+```
+
+**IP-only fallback (self-signed):**
 
 ```bash
 chmod +x scripts/oci/*.sh
 ./scripts/oci/generate-self-signed-cert.sh YOUR_PUBLIC_IP
 ```
 
-**Optional free hostname + Let's Encrypt:**
-
-1. Point `YOUR-IP.sslip.io` (or DuckDNS) to your public IP
-2. Update `.env` URLs to `https://that-hostname`
-3. Install certbot on host or use certbot container; mount certs into `nginx/certs/` as `fullchain.pem` and `privkey.pem`
-4. Rebuild frontend with updated `NEXT_PUBLIC_*` URLs
+Browsers will show security warnings with self-signed certs.
 
 ### 9. Deploy
 
 ```bash
 ./scripts/oci/deploy.sh
 ./scripts/oci/health-check.sh
+./scripts/oci/verify-deployment.sh
+# optional: ./scripts/oci/verify-deployment.sh --load-test
 ```
 
 Expect: `"database": "ok"`, simulation status idle (not RUNNING).
@@ -389,7 +419,9 @@ Use `-k` / trust self-signed cert or fix TLS first.
 | `nginx/nginx.conf` | Nginx main config |
 | `nginx/conf.d/tradeverse.conf` | Reverse proxy + WSS |
 | `nginx/certs/` | TLS certs (generated on server) |
-| `scripts/oci/*.sh` | Deploy, backup, restore, certs, health |
+| `scripts/oci/*.sh` | Deploy, backup, restore, certs, health, bootstrap |
+| `scripts/oci/OCI_CONSOLE_CHECKLIST.md` | Oracle Console VM + firewall steps |
+| `.cursor/mcp.json` | Optional Oracle OCI MCP for local Cursor |
 | `backups/` | Local pg_dump output (gitignored content) |
 | `.dockerignore` | Faster, safer builds |
 
