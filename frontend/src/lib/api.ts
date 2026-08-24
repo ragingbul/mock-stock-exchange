@@ -135,15 +135,26 @@ export async function joinSession(displayName: string): Promise<{
   display_name: string;
   access_token: string;
 }> {
-  const res = await apiPost<{ trader_id: number; display_name: string; access_token: string }>(
-    "/auth/join",
-    { display_name: displayName },
+  const res = await fetchWithTimeout(
+    apiUrl("/auth/join"),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...defaultHeaders() },
+      body: JSON.stringify({ display_name: displayName }),
+    },
+    60_000,
   );
+  if (!res.ok) throw new Error(await parseError(res));
+  const data = (await res.json()) as {
+    trader_id: number;
+    display_name: string;
+    access_token: string;
+  };
   if (typeof window !== "undefined") {
-    window.localStorage.setItem("mse_access_token", res.access_token);
-    window.localStorage.setItem("mse_trader_id", String(res.trader_id));
+    window.localStorage.setItem("mse_access_token", data.access_token);
+    window.localStorage.setItem("mse_trader_id", String(data.trader_id));
   }
-  return res;
+  return data;
 }
 
 export type SessionBootstrap = {

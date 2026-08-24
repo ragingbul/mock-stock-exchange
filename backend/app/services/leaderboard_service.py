@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -10,8 +11,23 @@ from sqlalchemy.orm import Session
 from app.models import LeaderboardSnapshot, Trade, Trader, TraderType
 from app.services.portfolio_service import get_portfolio
 
+_leaderboard_cache: tuple[float, list[dict]] | None = None
+LEADERBOARD_CACHE_SEC = 5.0
 
-def compute_leaderboard(db: Session, *, humans_only: bool = True) -> list[dict]:
+
+def invalidate_leaderboard_cache() -> None:
+    global _leaderboard_cache
+    _leaderboard_cache = None
+
+
+def compute_leaderboard(db: Session, *, humans_only: bool = True, use_cache: bool = True) -> list[dict]:
+    global _leaderboard_cache
+    now = time.time()
+    if use_cache and _leaderboard_cache is not None:
+        cached_at, rows = _leaderboard_cache
+        if now - cached_at < LEADERBOARD_CACHE_SEC:
+            return rows
+
     traders = list(db.scalars(select(Trader).where(Trader.is_active.is_(True))).all())
     rows = []
     for trader in traders:
@@ -49,6 +65,7 @@ def compute_leaderboard(db: Session, *, humans_only: bool = True) -> list[dict]:
     rows.sort(key=lambda r: r["score"], reverse=True)
     for i, row in enumerate(rows, start=1):
         row["rank"] = i
+    _leaderboard_cache = (now, rows)
     return rows
 
 

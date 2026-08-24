@@ -43,4 +43,4 @@ def test_settings_database_url() -> None:
     settings = get_settings()
     url = settings.database_url
     assert url.startswith("postgresql+psycopg://") or url.startswith("sqlite")
-    assert settings.default_starting_capital == 1_000_000.0
+    assert settings.default_starting_capital == 500_000.0
