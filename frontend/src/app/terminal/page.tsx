@@ -444,7 +444,7 @@ export default function TerminalPage() {
 
   useEffect(() => {
     if (connected) return;
-    const id = window.setInterval(() => void refresh(), 12000);
+    const id = window.setInterval(() => void refresh(), 20000);
     return () => window.clearInterval(id);
   }, [connected, refresh]);
 
@@ -456,11 +456,12 @@ export default function TerminalPage() {
 
   async function join() {
     try {
+      setError(null);
       const created = await joinSession(traderName || "Trader");
       setTraderId(created.trader_id);
-      await resyncBootstrap();
-      await refreshWallet(created.trader_id);
-      await refresh();
+      void resyncBootstrap().catch(() => {});
+      void refreshWallet(created.trader_id).catch(() => {});
+      void refresh().catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not join session");
     }

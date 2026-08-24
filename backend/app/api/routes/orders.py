@@ -73,6 +73,10 @@ async def create_order(
     )
     await manager.broadcast("WALLET_UPDATED", {"trader_id": trader.id})
 
+    from app.services.leaderboard_service import invalidate_leaderboard_cache
+
+    invalidate_leaderboard_cache()
+
     # Evaluate stop-loss / take-profit after price moves
     if trades:
         from app.services import conditional_order_service

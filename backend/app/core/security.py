@@ -50,16 +50,26 @@ def _client_key(request: Request) -> str:
     return "unknown"
 
 
-def enforce_rate_limit(request: Request, *, bucket: str | None = None) -> None:
+def enforce_rate_limit(request: Request, *, bucket: str | None = None, limit: int | None = None) -> None:
     settings = get_settings()
     key = bucket or _client_key(request)
+    cap = limit if limit is not None else settings.rate_limit_per_minute
     now = time.time()
     window = 60.0
     bucket_times = _rate_buckets.setdefault(key, [])
     bucket_times[:] = [t for t in bucket_times if now - t < window]
-    if len(bucket_times) >= settings.rate_limit_per_minute:
+    if len(bucket_times) >= cap:
         raise HTTPException(status_code=429, detail="rate limit exceeded")
     bucket_times.append(now)
+
+
+def enforce_join_rate_limit(request: Request) -> None:
+    settings = get_settings()
+    enforce_rate_limit(
+        request,
+        bucket=f"join:{_client_key(request)}",
+        limit=settings.join_rate_limit_per_minute,
+    )
 
 
 def require_admin(

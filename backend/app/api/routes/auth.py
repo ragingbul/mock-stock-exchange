@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import create_access_token, enforce_rate_limit
+from app.core.security import create_access_token, enforce_join_rate_limit, enforce_rate_limit
 from app.models.enums import TraderType
 from app.schemas import TraderCreate
 from app.services import trader_service
@@ -43,7 +43,7 @@ def join_session(
     payload: JoinRequest,
     db: Session = Depends(get_db),
 ) -> JoinResponse:
-    enforce_rate_limit(request)
+    enforce_join_rate_limit(request)
     suffix = secrets.token_hex(3)
     trader = trader_service.create_trader(
         db,

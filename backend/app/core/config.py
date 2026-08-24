@@ -48,8 +48,8 @@ class Settings(BaseSettings):
     postgres_port: int = 5432
     postgres_db: str = "mock_stock_exchange"
     database_url_override: str | None = Field(default=None, validation_alias="DATABASE_URL")
-    db_pool_size: int = Field(default=5, validation_alias="DB_POOL_SIZE")
-    db_max_overflow: int = Field(default=10, validation_alias="DB_MAX_OVERFLOW")
+    db_pool_size: int = Field(default=10, validation_alias="DB_POOL_SIZE")
+    db_max_overflow: int = Field(default=20, validation_alias="DB_MAX_OVERFLOW")
     db_pool_recycle: int = Field(default=1800, validation_alias="DB_POOL_RECYCLE")
     db_pool_timeout: int = Field(default=30, validation_alias="DB_POOL_TIMEOUT")
     auto_init_db: bool = Field(default=True, validation_alias="AUTO_INIT_DB")
@@ -65,9 +65,12 @@ class Settings(BaseSettings):
     )
     auth_token_expire_minutes: int = 60 * 12
     rate_limit_per_minute: int = Field(default=1200, validation_alias="RATE_LIMIT_PER_MINUTE")
+    join_rate_limit_per_minute: int = Field(default=300, validation_alias="JOIN_RATE_LIMIT_PER_MINUTE")
 
     # Market defaults (used from Phase 1 onward)
-    default_starting_capital: float = 1_000_000.0
+    default_starting_capital: float = Field(
+        default=500_000.0, validation_alias="DEFAULT_STARTING_CAPITAL"
+    )
     max_position_per_stock: int = Field(default=100, validation_alias="MAX_POSITION_PER_STOCK")
     default_tick_size: float = 0.05
     default_circuit_pct: float = 0.10
@@ -88,7 +91,8 @@ class Settings(BaseSettings):
 
     ai_tick_min_sec: float = 15.0
     ai_tick_max_sec: float = 30.0
-    ai_max_actions_per_tick: int = Field(default=30, validation_alias="AI_MAX_ACTIONS_PER_TICK")
+    ai_max_actions_per_tick: int = Field(default=15, validation_alias="AI_MAX_ACTIONS_PER_TICK")
+    simulation_ai_enabled: bool = Field(default=True, validation_alias="SIMULATION_AI_ENABLED")
     news_impact_tolerance_pct: float = 0.5
     news_combined_impact_cap_pct: float = 20.0
 

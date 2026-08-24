@@ -25,9 +25,9 @@ logger = logging.getLogger(__name__)
 _task: asyncio.Task | None = None
 _stop = asyncio.Event()
 _lock_conn: Connection | None = None
-AI_TICK_INTERVAL_SEC = 45.0
+AI_TICK_INTERVAL_SEC = 90.0
 CLOCK_BROADCAST_INTERVAL = 5.0
-MARKET_PULSE_INTERVAL_REAL = 1.0
+MARKET_PULSE_INTERVAL_REAL = 2.0
 _last_clock_broadcast = 0.0
 _last_market_pulse_real = 0.0
 _market_pulse_seq = 0
@@ -126,8 +126,9 @@ def _run_tick_sync(delta: float, now_real: float) -> TickResult | None:
 
         settings = get_or_create_settings(db)
         state = get_or_create_state(db)
+        app_settings = get_settings()
 
-        if settings.simulation_ai_enabled:
+        if app_settings.simulation_ai_enabled and settings.simulation_ai_enabled:
             if elapsed - float(state.last_ai_tick_elapsed_sec) >= AI_TICK_INTERVAL_SEC:
                 try:
                     results = _run_ai_tick(db, elapsed)
