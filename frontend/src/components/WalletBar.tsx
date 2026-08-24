@@ -47,7 +47,9 @@ export function WalletBar({
           <button
             type="button"
             onClick={onWallet}
-            className="border border-white/25 px-2.5 py-1 text-[10px] uppercase hover:bg-white/10"
+            className={`border px-2.5 py-1 text-[10px] uppercase hover:bg-white/10 ${
+              showWallet ? "border-[#22c55e] text-[#22c55e]" : "border-white/25"
+            }`}
           >
             {showWallet ? "Hide Wallet" : "Wallet"}
           </button>

@@ -7,26 +7,14 @@ type Props = {
   onDismiss: () => void;
 };
 
-/** Single breaking-news alert for participants — one headline at a time. */
+/** Single breaking-news alert — headline only. */
 export function BreakingNewsAlert({ news, onDismiss }: Props) {
   if (!news) return null;
 
   return (
     <div className="fixed inset-x-4 top-20 z-40 mx-auto max-w-lg border border-[#ef4444]/50 bg-black p-4 shadow-lg md:inset-x-auto md:right-6 md:top-24">
       <p className="text-[10px] font-bold uppercase tracking-wider text-[#ef4444]">Breaking news</p>
-      <p className="mt-2 text-base font-medium">{news.title}</p>
-      {news.brief_points && news.brief_points.length > 0 ? (
-        <ul className="mt-2 space-y-1 text-sm text-white/60">
-          {news.brief_points.slice(0, 3).map((point, i) => (
-            <li key={i} className="flex gap-2 leading-snug">
-              <span className="text-[#ef4444]">•</span>
-              <span>{point}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        news.description && <p className="mt-2 text-sm text-white/60">{news.description}</p>
-      )}
+      <p className="mt-2 text-base font-medium leading-snug">{news.title}</p>
       <button
         type="button"
         className="mt-3 text-xs text-white/50 underline"

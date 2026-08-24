@@ -21,8 +21,8 @@
           "Economic growth remains strong, with businesses expanding and consumers continuing to spend.",
           "Healthy activity supports corporate revenues and keeps investor confidence elevated.",
           "Financials, industrials and consumer companies are among the sectors most likely to benefit.",
-          "Phase: EUPHORIA",
-          "Sectors impacted: Broad Market +2, Financials +2, Industrials +2"
+          "Businesses have room to expand hiring, investment and production while demand remains healthy.",
+          "Investors continue watching growth closely because stronger activity can support corporate earnings and valuations."
         ]
       }
     },
@@ -44,8 +44,8 @@
           "Demand for homes remains elevated as buyers continue entering the housing market.",
           "Strong demand supports homebuilders, property companies and mortgage-related businesses.",
           "Investors interpret the housing strength as evidence that the economy remains resilient.",
-          "Phase: EUPHORIA",
-          "Sectors impacted: Real Estate +5, Financials +4, Consumer +2"
+          "Higher home sales and construction activity can support employment and related industries.",
+          "Investors watch housing closely because a sustained slowdown could eventually affect lenders and household wealth."
         ]
       }
     },
@@ -66,8 +66,8 @@
           "Mortgage lenders report unusually high volumes of new home-loan business.",
           "Higher loan activity increases fee income and lending opportunities for financial institutions.",
           "The development reinforces the positive view of housing and credit markets.",
-          "Phase: EUPHORIA",
-          "Sectors impacted: Financials +5, Real Estate +3"
+          "Higher mortgage volumes can increase interest income, origination fees and related financial activity.",
+          "The strong lending environment also makes future changes in credit quality important to financial investors."
         ]
       }
     },
@@ -90,8 +90,8 @@
           "Companies are reporting earnings that are coming in ahead of market expectations.",
           "Better-than-expected profits suggest that business demand and operating conditions remain healthy.",
           "The results provide another reason for investors to maintain a positive outlook on equities.",
-          "Phase: EUPHORIA",
-          "Sectors impacted: Broad Market +3, Consumer +3, IT +3"
+          "Strong earnings give companies more room to invest, hire and withstand changes in market conditions.",
+          "Investors will watch upcoming results to see whether the earnings strength can be sustained."
         ]
       }
     },
@@ -113,8 +113,8 @@
           "Household spending remains strong across goods and services.",
           "Resilient consumption supports corporate sales and helps sustain economic growth.",
           "Consumer-focused companies benefit directly from the continued demand.",
-          "Phase: EUPHORIA",
-          "Sectors impacted: Consumer +5, Automobiles +4, Financials +2"
+          "Continued consumption supports business revenues and employment across the economy.",
+          "A sharp slowdown in spending would be an important warning sign for consumer companies and markets."
         ]
       }
     },
@@ -134,8 +134,8 @@
           "Investment banks report record revenues as market activity remains unusually strong.",
           "Strong trading, advisory and capital-markets activity supports financial-sector profitability.",
           "The results reinforce the broader perception that financial markets are in a favorable phase.",
-          "Phase: EUPHORIA",
-          "Sectors impacted: Financials +6"
+          "Strong investment-banking revenue reflects high transaction volumes and active capital markets.",
+          "Investors will watch whether the favorable financial-market environment continues."
         ]
       }
     },
@@ -157,8 +157,8 @@
           "Businesses and households continue to have relatively easy access to borrowing.",
           "Ample credit supports investment, consumption and property purchases.",
           "Investors view accessible financing as a sign that financial conditions remain supportive.",
-          "Phase: EUPHORIA",
-          "Sectors impacted: Financials +4, Real Estate +4, Infrastructure +2"
+          "Easy credit supports borrowing, investment and consumption across the economy.",
+          "Rapid credit growth can also create future risks if lending standards weaken."
         ]
       }
     },
@@ -180,8 +180,8 @@
           "Commodity prices rise as global demand remains strong.",
           "Higher demand points to robust industrial and consumer activity around the world.",
           "Commodity producers benefit, although higher input costs can eventually pressure other businesses.",
-          "Phase: EUPHORIA",
-          "Sectors impacted: Energy +5, Metals +5, Industrials +3"
+          "Commodity producers benefit from stronger prices and demand.",
+          "Higher input costs could eventually pressure manufacturers, transport companies and consumers."
         ]
       }
     },
@@ -202,8 +202,8 @@
           "Investor appetite for new listings remains strong, with the IPO market attracting significant demand.",
           "Strong IPO participation suggests that investors are comfortable taking on additional risk.",
           "The activity adds to the optimistic tone across equity markets.",
-          "Phase: EUPHORIA",
-          "Sectors impacted: IT +4, Financials +3"
+          "Strong IPO demand indicates that investors remain willing to allocate capital to higher-risk opportunities.",
+          "The strength of new listings is also a useful indicator of overall market sentiment."
         ]
       }
     },
@@ -245,8 +245,8 @@
           "A newly offered IPO receives far more investor demand than expected.",
           "The strong response suggests that investors are willing to pay for growth despite valuation risks.",
           "It reinforces the market's increasingly optimistic and speculative mood.",
-          "Phase: EUPHORIA",
-          "Sectors impacted: IT +5, Financials +3, Broad Market +2"
+          "The response shows that investors remain willing to chase growth and accept higher valuations.",
+          "Such enthusiasm can support prices but may also signal increasing speculative behavior."
         ]
       }
     },
@@ -335,8 +335,8 @@
           "Mortgage defaults begin to increase as some borrowers struggle to keep up with payments.",
           "Rising defaults are an early sign that the housing boom is becoming less sustainable.",
           "Lenders and investors with mortgage exposure face the first meaningful warning of losses.",
-          "Phase: CRACKS / DENIAL",
-          "Sectors impacted: Real Estate -3, Financials -2"
+          "Higher defaults can reduce lender profitability through provisions and credit losses.",
+          "Investors begin monitoring mortgage portfolios and housing data more closely for further deterioration."
         ]
       }
     },
@@ -357,8 +357,8 @@
           "Home prices begin falling after a prolonged period of rapid appreciation.",
           "Declining prices make it harder for highly leveraged homeowners to refinance or sell without losses.",
           "Banks, mortgage lenders and property-related companies become more exposed to downside risk.",
-          "Phase: CRACKS / DENIAL",
-          "Sectors impacted: Real Estate -5, Financials -2"
+          "Lower property values weaken the collateral supporting outstanding mortgages.",
+          "A prolonged decline could increase defaults and place additional pressure on financial institutions."
         ]
       }
     },
@@ -379,8 +379,8 @@
           "Losses begin appearing in the subprime mortgage market as weaker borrowers default.",
           "Mortgage-backed securities tied to these loans become harder to value.",
           "Investors start questioning how widely the losses may be distributed across the financial system.",
-          "Phase: CRACKS / DENIAL",
-          "Sectors impacted: Financials -5, Real Estate -3"
+          "Subprime losses can reduce the value of securities backed by these mortgages.",
+          "Investors become more cautious about institutions with large or highly leveraged mortgage exposures."
         ]
       }
     },
@@ -400,8 +400,8 @@
           "Ratings agencies downgrade mortgage securities as the underlying loan quality deteriorates.",
           "Lower ratings increase perceived risk and can force investors to reassess the value of these assets.",
           "Financial institutions holding the securities face additional pressure on capital and confidence.",
-          "Phase: CRACKS / DENIAL",
-          "Sectors impacted: Financials -6"
+          "Downgrades can force some investors to sell assets that no longer meet their rating requirements.",
+          "The resulting repricing can spread losses across banks and investment funds."
         ]
       }
     },
@@ -421,8 +421,8 @@
           "Major hedge funds report significant losses linked to mortgage-related investments.",
           "The losses show that housing weakness is affecting sophisticated investors beyond mortgage lenders.",
           "Concerns grow that losses could spread through banks, funds and other financial institutions.",
-          "Phase: CRACKS / DENIAL",
-          "Sectors impacted: Financials -5"
+          "Hedge-fund losses raise concerns about leverage and forced asset sales.",
+          "Investors begin looking for similar mortgage exposures elsewhere in the financial system."
         ]
       }
     },
@@ -443,8 +443,8 @@
           "An international bank freezes funds connected to mortgage-related assets amid uncertainty over their value.",
           "The move reflects growing difficulty in pricing and trading mortgage securities.",
           "Investors begin to worry that liquidity problems could spread beyond the housing market.",
-          "Phase: CRACKS / DENIAL",
-          "Sectors impacted: Financials -5, Broad Market -2"
+          "Freezing funds can prevent investors from withdrawing or trading their money normally.",
+          "The move increases concerns about liquidity and confidence in mortgage-related assets."
         ]
       }
     },
@@ -465,8 +465,8 @@
           "Central banks provide emergency liquidity as funding conditions become increasingly strained.",
           "The goal is to keep financial institutions supplied with cash and prevent a broader credit disruption.",
           "The intervention offers short-term relief but also signals that authorities are becoming concerned about systemic risk.",
-          "Phase: CRACKS / DENIAL",
-          "Sectors impacted: Financials +3, Broad Market +2"
+          "Liquidity support can prevent otherwise viable institutions from failing because of temporary funding shortages.",
+          "Markets nevertheless treat the intervention as evidence that financial stress is becoming significant."
         ]
       }
     },
@@ -487,8 +487,8 @@
           "Markets rebound after emergency intervention calms immediate funding concerns.",
           "Investors respond positively to the prospect of stronger official support.",
           "The recovery remains fragile because the underlying housing and credit problems have not disappeared.",
-          "Phase: CRACKS / DENIAL",
-          "Sectors impacted: Financials +5, Broad Market +4"
+          "The rebound shows how quickly markets can respond to policy announcements.",
+          "Investors remain cautious because liquidity support does not remove the underlying credit losses."
         ]
       }
     },
@@ -510,8 +510,8 @@
           "Corporate earnings remain relatively strong even as financial-sector concerns increase.",
           "Healthy profits provide some support for equities and suggest that the real economy has not yet fully weakened.",
           "However, investors are increasingly focused on whether financial stress will eventually hit corporate demand.",
-          "Phase: CRACKS / DENIAL",
-          "Sectors impacted: IT +3, Consumer +2, Industrials +2"
+          "Strong earnings provide some protection for the broader market during the early stages of financial stress.",
+          "The key question becomes whether tighter credit will eventually weaken corporate activity."
         ]
       }
     },
@@ -552,8 +552,8 @@
           "Demand for speculative IPOs surges even as early financial warning signs appear.",
           "Investors continue to chase new growth opportunities and accept significant risk.",
           "The behavior highlights how optimism can persist even while underlying market conditions begin deteriorating.",
-          "Phase: CRACKS / DENIAL",
-          "Sectors impacted: IT +6, Financials +2"
+          "The continued appetite for speculative assets suggests many investors still expect the expansion to continue.",
+          "A reversal in sentiment could leave speculative stocks and new listings vulnerable to sharp declines."
         ]
       }
     },
@@ -642,8 +642,8 @@
           "A major bank warns that credit-related losses may be much larger than previously expected.",
           "The warning raises fresh questions about the strength of bank balance sheets.",
           "Investors become more cautious as the potential scale of financial losses becomes harder to estimate.",
-          "Phase: CRACKS / DENIAL",
-          "Sectors impacted: Financials -7, Broad Market -3"
+          "Larger-than-expected losses can force banks to raise capital or reduce lending.",
+          "The warning increases uncertainty over the true value of mortgage-related assets."
         ]
       }
     },
@@ -664,8 +664,8 @@
           "Government officials reassure investors that the financial system remains stable.",
           "The statement is intended to calm fears about banks and credit markets.",
           "Confidence improves temporarily, although investors increasingly look for concrete evidence rather than reassurance alone.",
-          "Phase: CRACKS / DENIAL",
-          "Sectors impacted: Financials +2, Broad Market +2"
+          "Official reassurance can reduce panic and discourage unnecessary selling.",
+          "Markets increasingly look for concrete financial results and policy action to confirm that stability is real."
         ]
       }
     },
@@ -687,8 +687,8 @@
           "Foreclosures rise sharply as more homeowners fall behind on mortgage payments.",
           "More distressed properties enter the market, putting additional pressure on home prices.",
           "Lenders face larger losses while housing-related businesses come under increasing strain.",
-          "Phase: CRASH",
-          "Sectors impacted: Real Estate -8, Financials -5, Consumer -3"
+          "Rising foreclosures increase the supply of distressed homes entering the market.",
+          "The resulting price pressure can create a cycle of lower collateral values and further defaults."
         ]
       }
     },
@@ -709,8 +709,8 @@
           "A major mortgage lender fails as losses and funding pressures become unsustainable.",
           "The failure demonstrates that housing problems are now threatening financial institutions directly.",
           "Market participants begin looking for signs of similar weakness at other lenders.",
-          "Phase: CRASH",
-          "Sectors impacted: Financials -10, Real Estate -6"
+          "The failure can disrupt borrowers, investors and counterparties connected to the lender.",
+          "Markets begin reassessing other institutions with similar housing and credit exposures."
         ]
       }
     },
@@ -732,8 +732,8 @@
           "Credit markets begin to freeze as banks become reluctant to lend amid uncertainty about counterparty risk.",
           "Short-term funding becomes harder to obtain for banks and businesses.",
           "The tightening creates a feedback loop in which less credit can further weaken economic activity.",
-          "Phase: CRASH",
-          "Sectors impacted: Financials -8, Industrials -4, Consumer -3"
+          "Banks may hoard cash when they are uncertain about the solvency of counterparties.",
+          "The resulting liquidity shortage can quickly spread from financial markets into the real economy."
         ]
       }
     },
@@ -754,8 +754,8 @@
           "A major investment bank faces an acute liquidity crisis and struggles to secure funding.",
           "Investors fear that another large financial institution could fail.",
           "The episode sharply increases uncertainty across equity, credit and interbank markets.",
-          "Phase: CRASH",
-          "Sectors impacted: Financials -10, Broad Market -4"
+          "Investment banks rely heavily on market funding, making liquidity stress particularly dangerous.",
+          "The situation raises the possibility of forced asset sales and further market losses."
         ]
       }
     },
@@ -776,8 +776,8 @@
           "Central banks launch emergency measures to contain rapidly worsening financial stress.",
           "Liquidity support is intended to keep key markets functioning and prevent disorderly failures.",
           "The scale of intervention signals that the crisis has moved beyond the housing sector.",
-          "Phase: CRASH",
-          "Sectors impacted: Financials +4, Broad Market +2"
+          "Emergency action can reduce the immediate risk of a disorderly collapse.",
+          "Repeated interventions also indicate that private-market confidence is weakening."
         ]
       }
     },
@@ -798,8 +798,8 @@
           "Major mortgage-finance institutions come under severe pressure as losses continue to build.",
           "Weakness at these institutions threatens both housing finance and broader credit availability.",
           "Investors become increasingly concerned about the government's potential role in stabilizing them.",
-          "Phase: CRASH",
-          "Sectors impacted: Financials -10, Real Estate -8"
+          "Mortgage-finance institutions are critical to keeping housing credit available.",
+          "Pressure on them can therefore affect both property markets and the wider banking system."
         ]
       }
     },
@@ -820,8 +820,8 @@
           "The government announces emergency support for major mortgage-finance institutions.",
           "The intervention aims to prevent further failures and preserve access to housing finance.",
           "The move provides temporary stability but confirms the seriousness of the financial crisis.",
-          "Phase: CRASH",
-          "Sectors impacted: Financials -6, Real Estate -4"
+          "Government support is intended to reassure lenders, investors and borrowers.",
+          "The intervention also increases expectations that authorities may act again if systemic institutions remain under pressure."
         ]
       }
     },
@@ -842,8 +842,8 @@
           "A major investment bank announces an emergency sale after coming under intense financial pressure.",
           "An emergency transaction is viewed as preferable to an uncontrolled failure.",
           "The episode reinforces fears that other highly leveraged financial firms may also be vulnerable.",
-          "Phase: CRASH",
-          "Sectors impacted: Financials -12, Broad Market -6"
+          "An emergency sale can protect creditors and counterparties from a disorderly failure.",
+          "The event signals that normal funding channels are no longer functioning reliably."
         ]
       }
     },
@@ -868,8 +868,8 @@
           "Lehman Brothers files for bankruptcy in this fictional in-game event, marking a major shock.",
           "The failure represents a sudden loss of confidence in a major financial institution.",
           "The event accelerates the market panic and sharply increases pressure on credit and equity markets.",
-          "Phase: CRASH",
-          "Sectors impacted: Financials -15, Real Estate -10, Broad Market -10"
+          "The bankruptcy can trigger losses for creditors, counterparties and investors.",
+          "Its scale makes it a major confidence shock and accelerates pressure across credit and equity markets."
         ]
       }
     },
@@ -903,8 +903,8 @@
           "AIG requires emergency government support after severe liquidity pressure develops.",
           "Its exposure to mortgage-related assets and financial contracts makes its distress a systemic concern.",
           "Official support is intended to prevent a disorderly failure from causing further damage to the financial system.",
-          "Phase: CRASH",
-          "Sectors impacted: Financials -12, Broad Market -6"
+          "AIG's interconnected financial contracts mean its failure could affect many other institutions.",
+          "Emergency support is intended to limit those spillover effects and prevent further forced selling."
         ]
       }
     },
@@ -924,8 +924,8 @@
           "A major investment bank is acquired in an emergency transaction to prevent further disruption.",
           "The deal removes one immediate source of systemic risk.",
           "At the same time, the rescue confirms that normal market mechanisms are under severe strain.",
-          "Phase: CRASH",
-          "Sectors impacted: Financials -8"
+          "The acquisition can stabilize customers and counterparties linked to the institution.",
+          "The need for another rescue reinforces concerns about the resilience of major financial firms."
         ]
       }
     },
@@ -946,8 +946,8 @@
           "Authorities propose a large financial rescue package to stabilize banks and credit markets.",
           "The proposal is aimed at removing distressed assets and restoring confidence in the financial system.",
           "Investors view the intervention as a major test of whether policymakers can stop the crisis from spreading.",
-          "Phase: CRASH",
-          "Sectors impacted: Financials +4, Broad Market +3"
+          "A large rescue package can provide capital and liquidity when private funding is unavailable.",
+          "Investors will judge the plan by whether it restores lending and confidence."
         ]
       }
     },
@@ -968,8 +968,8 @@
           "The government approves an emergency financial rescue program.",
           "The program provides support to troubled institutions and is designed to restore market liquidity and confidence.",
           "The decision marks a major expansion of government involvement in stabilizing the financial system.",
-          "Phase: CRASH",
-          "Sectors impacted: Financials +5, Broad Market +4"
+          "The program provides a stronger backstop for the financial system.",
+          "Its effectiveness depends on whether banks resume lending and investors regain confidence."
         ]
       }
     },
@@ -992,8 +992,8 @@
           "Global stock markets plunge as investors react to worsening financial and economic conditions.",
           "Fear of bank failures, weaker earnings and recession drives broad-based selling.",
           "The sell-off reflects a sharp shift from risk-taking toward capital preservation.",
-          "Phase: CRASH",
-          "Sectors impacted: Financials -15, Broad Market -12, Industrials -8"
+          "The sell-off affects multiple sectors as investors reduce exposure to risk.",
+          "High volatility and falling liquidity can make market moves much more severe than normal."
         ]
       }
     },
@@ -1015,8 +1015,8 @@
           "The recession deepens as financial stress begins weighing heavily on businesses and households.",
           "Tighter credit and weaker demand reduce investment, employment and consumer activity.",
           "Investors expect corporate profits to remain under pressure for an extended period.",
-          "Phase: CRASH",
-          "Sectors impacted: Financials -8, Industrials -7, Consumer -6"
+          "Weak demand begins affecting revenues, employment and investment across the economy.",
+          "The financial crisis is now clearly translating into a broader economic downturn."
         ]
       }
     },
@@ -1039,8 +1039,8 @@
           "Major companies report severe declines in earnings as demand weakens.",
           "Falling profits reinforce concerns that the crisis is spreading from finance into the real economy.",
           "Equity valuations come under further pressure as earnings expectations are revised lower.",
-          "Phase: CRASH",
-          "Sectors impacted: Industrials -7, Broad Market -6, Consumer -6"
+          "Lower earnings reduce the fundamental value investors assign to many companies.",
+          "Further cuts to profit forecasts could create additional selling pressure."
         ]
       }
     },
@@ -1062,8 +1062,8 @@
           "Consumer confidence reaches a multi-year low as households become increasingly worried about the economy.",
           "Lower confidence can lead to delayed purchases and weaker discretionary spending.",
           "Consumer-facing companies face additional pressure as the downturn becomes more visible.",
-          "Phase: CRASH",
-          "Sectors impacted: Consumer -8, Automobiles -7, Financials -4"
+          "Weak confidence can reinforce an economic slowdown by reducing discretionary spending.",
+          "Markets watch consumer sentiment because household demand is a major driver of economic activity."
         ]
       }
     },
@@ -1085,8 +1085,8 @@
           "Credit conditions remain severely restricted despite earlier rescue measures.",
           "Businesses and financial institutions continue to face difficulty securing affordable funding.",
           "The lack of credit slows investment and makes a quick economic recovery less likely.",
-          "Phase: CRASH",
-          "Sectors impacted: Financials -8, Real Estate -6, Industrials -5"
+          "Restricted credit makes it difficult for businesses to finance working capital and investment.",
+          "A sustained recovery is harder to achieve until normal lending activity returns."
         ]
       }
     },
@@ -1107,8 +1107,8 @@
           "Central banks coordinate emergency liquidity measures to support financial institutions and credit markets.",
           "The coordinated response is intended to restore confidence and reduce funding stress.",
           "Investors begin to see stronger policy action as a potential foundation for stabilization.",
-          "Phase: RECOVERY",
-          "Sectors impacted: Financials +4, Broad Market +3"
+          "Coordinated action reduces the risk that liquidity problems in one market spread internationally.",
+          "The measures provide a stronger policy backstop and improve expectations for financial stability."
         ]
       }
     },
@@ -1131,8 +1131,8 @@
           "Interest rates are cut toward emergency levels to encourage borrowing and economic activity.",
           "Lower rates reduce financing costs for households and businesses.",
           "The move is designed to support demand and improve conditions in stressed credit markets.",
-          "Phase: RECOVERY",
-          "Sectors impacted: Financials +6, Real Estate +5, Industrials +3"
+          "Lower rates can reduce debt-servicing costs for households and companies.",
+          "The effectiveness of rate cuts depends on whether banks and borrowers are willing and able to use the cheaper credit."
         ]
       }
     },
@@ -1154,8 +1154,8 @@
           "Government authorities expand financial support as stabilization efforts continue.",
           "Additional measures aim to strengthen institutions and prevent renewed financial stress.",
           "The expanding policy response begins to improve expectations for a gradual recovery.",
-          "Phase: RECOVERY",
-          "Sectors impacted: Financials +6, Infrastructure +5, Industrials +4"
+          "Additional government support can help maintain demand while private-sector activity remains weak.",
+          "Investors begin looking for evidence that policy measures are translating into real economic improvement."
         ]
       }
     },
@@ -1176,8 +1176,8 @@
           "Housing markets show early signs of stabilization after a prolonged decline.",
           "Falling prices and activity begin to level out, reducing fears of an accelerating housing collapse.",
           "The improvement provides a positive signal for lenders, property companies and the wider economy.",
-          "Phase: RECOVERY",
-          "Sectors impacted: Real Estate +7, Financials +4"
+          "Stabilization in housing can reduce pressure on mortgage portfolios.",
+          "A bottoming housing market is an important step toward broader financial recovery."
         ]
       }
     },
@@ -1199,8 +1199,8 @@
           "The contraction in industrial activity begins to slow.",
           "The change suggests that the sharpest part of the economic downturn may be passing.",
           "Investors begin looking for evidence that corporate demand and production can recover.",
-          "Phase: RECOVERY",
-          "Sectors impacted: Industrials +6, Metals +6, Energy +5"
+          "Slower industrial contraction suggests demand may be stabilizing.",
+          "Investors begin looking toward cyclical companies that could benefit from a future rebound."
         ]
       }
     },
@@ -1221,8 +1221,8 @@
           "Consumer confidence stabilizes after a prolonged period of deterioration.",
           "Households appear less pessimistic about future economic conditions.",
           "A stabilization in sentiment can be an early step toward a recovery in consumer spending.",
-          "Phase: RECOVERY",
-          "Sectors impacted: Consumer +5, Automobiles +5"
+          "Stable confidence reduces the risk of another sharp decline in household spending.",
+          "Further improvement would strengthen expectations for a gradual consumer-led recovery."
         ]
       }
     },
@@ -1290,8 +1290,8 @@
           "Stock markets stage a major recovery rally as investors respond to improving conditions and policy support.",
           "Risk appetite returns as fears of an uncontrolled financial collapse recede.",
           "The rally marks a major shift from crisis-driven selling toward expectations of stabilization and recovery.",
-          "Phase: RECOVERY",
-          "Sectors impacted: Broad Market +8, Financials +7, IT +7"
+          "The rally can lift financial, industrial and consumer stocks as risk appetite returns.",
+          "The move signals a major change in investor expectations even though some underlying problems remain."
         ]
       }
     },
