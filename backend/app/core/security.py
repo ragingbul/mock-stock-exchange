@@ -50,23 +50,23 @@ def _client_key(request: Request) -> str:
     return "unknown"
 
 
-def enforce_rate_limit(request: Request) -> None:
+def enforce_rate_limit(request: Request, *, bucket: str | None = None) -> None:
     settings = get_settings()
-    key = _client_key(request)
+    key = bucket or _client_key(request)
     now = time.time()
     window = 60.0
-    bucket = _rate_buckets.setdefault(key, [])
-    bucket[:] = [t for t in bucket if now - t < window]
-    if len(bucket) >= settings.rate_limit_per_minute:
+    bucket_times = _rate_buckets.setdefault(key, [])
+    bucket_times[:] = [t for t in bucket_times if now - t < window]
+    if len(bucket_times) >= settings.rate_limit_per_minute:
         raise HTTPException(status_code=429, detail="rate limit exceeded")
-    bucket.append(now)
+    bucket_times.append(now)
 
 
 def require_admin(
     request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> dict:
-    enforce_rate_limit(request)
+    # Admin is secret/JWT protected — do not share the public IP bucket with all users.
     settings = get_settings()
     if credentials is None:
         raise HTTPException(status_code=401, detail="admin authorization required")
@@ -98,13 +98,13 @@ def require_trader(
     db: Annotated[Session, Depends(get_db)],
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> Trader:
-    enforce_rate_limit(request)
     if credentials is None:
         raise HTTPException(status_code=401, detail="authorization required")
     payload = decode_token(credentials.credentials)
     trader_id = payload.get("trader_id")
     if trader_id is None:
         raise HTTPException(status_code=401, detail="invalid participant token")
+    enforce_rate_limit(request, bucket=f"trader:{trader_id}")
     trader = db.get(Trader, int(trader_id))
     if trader is None or not trader.is_active:
         raise HTTPException(status_code=401, detail="trader not found or inactive")
