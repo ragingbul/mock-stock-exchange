@@ -16,6 +16,7 @@ from app.ai.momentum import MomentumStrategy
 from app.ai.noise import NoiseStrategy
 from app.ai.panic import PanicStrategy
 from app.ai.value_investor import ValueInvestorStrategy
+from app.core.config import get_settings
 from app.exchange.book_registry import books
 from app.models import AIAgent, Holding, OrderSide, OrderType, Stock, Trader, TraderType
 from app.schemas import TraderCreate
@@ -211,11 +212,15 @@ def run_agent_once(db: Session, agent: AIAgent, stock: Stock) -> dict:
 
 
 def run_all_agents(db: Session) -> list[dict]:
+    settings = get_settings()
+    max_actions = max(1, int(settings.ai_max_actions_per_tick))
     agents = list(db.scalars(select(AIAgent).where(AIAgent.is_enabled.is_(True))).all())
     stocks = list(db.scalars(select(Stock).where(Stock.is_open.is_(True))).all())
-    results = []
+    results: list[dict] = []
     for agent in agents:
         for stock in stocks:
+            if len(results) >= max_actions:
+                return results
             results.append(run_agent_once(db, agent, stock))
     return results
 

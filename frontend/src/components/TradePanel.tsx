@@ -201,7 +201,6 @@ export function TradePanel({
               <button
                 type="button"
                 className="flex-1 border border-white/25 py-3"
-                disabled={confirmLoading}
                 onClick={onCancelConfirm}
               >
                 Cancel
