@@ -9,9 +9,20 @@ type Props = {
   ret?: string | null;
   onLeaderboard: () => void;
   showLeaderboard: boolean;
+  onWallet: () => void;
+  showWallet: boolean;
 };
 
-export function WalletBar({ cash, portfolio, pnl, ret, onLeaderboard, showLeaderboard }: Props) {
+export function WalletBar({
+  cash,
+  portfolio,
+  pnl,
+  ret,
+  onLeaderboard,
+  showLeaderboard,
+  onWallet,
+  showWallet,
+}: Props) {
   return (
     <header className="sticky top-0 z-30 border-b border-white/15 bg-black/95 px-3 py-2 backdrop-blur sm:px-4">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 sm:gap-3">
@@ -33,6 +44,13 @@ export function WalletBar({ cash, portfolio, pnl, ret, onLeaderboard, showLeader
             <span className="text-white/40">Return </span>
             <span className="tabular-nums">{ret != null ? fmtPct(ret) : "—"}</span>
           </span>
+          <button
+            type="button"
+            onClick={onWallet}
+            className="border border-white/25 px-2.5 py-1 text-[10px] uppercase hover:bg-white/10"
+          >
+            {showWallet ? "Hide Wallet" : "Wallet"}
+          </button>
           <button
             type="button"
             onClick={onLeaderboard}

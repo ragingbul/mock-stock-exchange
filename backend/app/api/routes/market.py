@@ -25,6 +25,7 @@ def market_status(db: Session = Depends(get_db)) -> dict:
             "id": detail["id"],
             "title": detail["title"],
             "description": detail["description"],
+            "brief_points": detail.get("brief_points") or [],
             "released_at": detail["released_at"],
             "sector_impacts": detail["sector_impacts"],
         }
@@ -48,6 +49,7 @@ def public_news(db: Session = Depends(get_db)) -> list[NewsRead]:
                 update={
                     "effective_impact": effective_impact(event),
                     "sector_impacts": detail["sector_impacts"],
+                    "brief_points": detail.get("brief_points") or [],
                 }
             )
         )

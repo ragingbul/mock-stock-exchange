@@ -154,10 +154,78 @@ export type SessionBootstrap = {
   sectors: SectorGroup[];
   simulation: Record<string, unknown>;
   released_news_count?: number;
-  released_news?: Array<{ id: number; title: string; description?: string; released_at?: string }>;
+  released_news?: Array<{
+    id: number;
+    title: string;
+    description?: string;
+    brief_points?: string[];
+    released_at?: string;
+  }>;
   leaderboard?: LeaderboardRow[];
   open_ipos?: IPO[];
   ipo_applications?: Array<{ id: number; ipo_id: number; status: string }>;
+};
+
+export type PortfolioDetail = {
+  trader_id: number;
+  name: string;
+  cash: string;
+  cash_blocked_ipo: string;
+  available_cash: string;
+  invested: string;
+  starting_capital: string;
+  holdings_value: string;
+  portfolio_value: string;
+  realized_pnl: string;
+  unrealized_pnl: string;
+  total_pnl: string;
+  return_pct: string;
+  holdings: HoldingDetail[];
+};
+
+export type HoldingDetail = {
+  id: number;
+  stock_id: number;
+  ticker: string | null;
+  quantity: number;
+  avg_cost: string;
+  market_price?: string | null;
+  market_value?: string | null;
+  unrealized_pnl?: string | null;
+};
+
+export type EnrichedHolding = HoldingDetail & {
+  return_pct?: string | null;
+};
+
+export type TransactionRow = {
+  id: string;
+  at: string;
+  ticker?: string | null;
+  side?: string | null;
+  quantity: number;
+  price?: string | null;
+  status: string;
+};
+
+export type OrderRecord = {
+  id: number;
+  stock_id: number;
+  side: string;
+  quantity: number;
+  status: string;
+  reject_reason?: string | null;
+  created_at?: string | null;
+};
+
+export type TradeRecord = {
+  id: number;
+  stock_id: number;
+  quantity: number;
+  price: string;
+  executed_at?: string | null;
+  ticker?: string | null;
+  side?: string | null;
 };
 
 type Wallet = {
@@ -196,6 +264,57 @@ type IPO = {
 
 export async function fetchSessionBootstrap(): Promise<SessionBootstrap> {
   return apiGet<SessionBootstrap>("/session/bootstrap");
+}
+
+export async function fetchPortfolio(traderId: number): Promise<PortfolioDetail> {
+  return apiGet<PortfolioDetail>(`/traders/${traderId}/portfolio`);
+}
+
+export async function fetchOrders(): Promise<OrderRecord[]> {
+  return apiGet<OrderRecord[]>("/orders");
+}
+
+export async function fetchTrades(): Promise<TradeRecord[]> {
+  return apiGet<TradeRecord[]>("/trades");
+}
+
+export function mergeTransactions(
+  orders: OrderRecord[],
+  trades: TradeRecord[],
+  stockTickers?: Map<number, string>,
+): TransactionRow[] {
+  const stockTicker = new Map(stockTickers ?? []);
+  for (const t of trades) {
+    if (t.ticker) stockTicker.set(t.stock_id, t.ticker);
+  }
+
+  const rows: TransactionRow[] = [];
+
+  for (const o of orders) {
+    rows.push({
+      id: `order-${o.id}`,
+      at: o.created_at ?? new Date(0).toISOString(),
+      ticker: stockTicker.get(o.stock_id) ?? null,
+      side: o.side,
+      quantity: o.quantity,
+      price: null,
+      status: o.status,
+    });
+  }
+
+  for (const t of trades) {
+    rows.push({
+      id: `trade-${t.id}`,
+      at: t.executed_at ?? new Date(0).toISOString(),
+      ticker: t.ticker ?? stockTicker.get(t.stock_id) ?? null,
+      side: t.side ?? null,
+      quantity: t.quantity,
+      price: t.price,
+      status: "filled",
+    });
+  }
+
+  return rows;
 }
 
 export async function adminLogin(secret: string): Promise<{ access_token: string }> {

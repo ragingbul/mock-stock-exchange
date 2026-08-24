@@ -16,7 +16,14 @@
           "Financials": 2,
           "Industrials": 2,
           "Consumer": 2
-        }
+        },
+        "brief_points": [
+          "Economic growth remains strong, with businesses expanding and consumers continuing to spend.",
+          "Healthy activity supports corporate revenues and keeps investor confidence elevated.",
+          "Financials, industrials and consumer companies are among the sectors most likely to benefit.",
+          "Phase: EUPHORIA",
+          "Sectors impacted: Broad Market +2, Financials +2, Industrials +2"
+        ]
       }
     },
     {
@@ -32,7 +39,14 @@
           "Financials": 4,
           "Real Estate": 5,
           "Consumer": 2
-        }
+        },
+        "brief_points": [
+          "Demand for homes remains elevated as buyers continue entering the housing market.",
+          "Strong demand supports homebuilders, property companies and mortgage-related businesses.",
+          "Investors interpret the housing strength as evidence that the economy remains resilient.",
+          "Phase: EUPHORIA",
+          "Sectors impacted: Real Estate +5, Financials +4, Consumer +2"
+        ]
       }
     },
     {
@@ -47,7 +61,14 @@
         "sector_impacts": {
           "Financials": 5,
           "Real Estate": 3
-        }
+        },
+        "brief_points": [
+          "Mortgage lenders report unusually high volumes of new home-loan business.",
+          "Higher loan activity increases fee income and lending opportunities for financial institutions.",
+          "The development reinforces the positive view of housing and credit markets.",
+          "Phase: EUPHORIA",
+          "Sectors impacted: Financials +5, Real Estate +3"
+        ]
       }
     },
     {
@@ -64,7 +85,14 @@
           "Consumer": 3,
           "IT": 3,
           "Industrials": 2
-        }
+        },
+        "brief_points": [
+          "Companies are reporting earnings that are coming in ahead of market expectations.",
+          "Better-than-expected profits suggest that business demand and operating conditions remain healthy.",
+          "The results provide another reason for investors to maintain a positive outlook on equities.",
+          "Phase: EUPHORIA",
+          "Sectors impacted: Broad Market +3, Consumer +3, IT +3"
+        ]
       }
     },
     {
@@ -80,7 +108,14 @@
           "Consumer": 5,
           "Automobiles": 4,
           "Financials": 2
-        }
+        },
+        "brief_points": [
+          "Household spending remains strong across goods and services.",
+          "Resilient consumption supports corporate sales and helps sustain economic growth.",
+          "Consumer-focused companies benefit directly from the continued demand.",
+          "Phase: EUPHORIA",
+          "Sectors impacted: Consumer +5, Automobiles +4, Financials +2"
+        ]
       }
     },
     {
@@ -94,7 +129,14 @@
       "payload": {
         "sector_impacts": {
           "Financials": 6
-        }
+        },
+        "brief_points": [
+          "Investment banks report record revenues as market activity remains unusually strong.",
+          "Strong trading, advisory and capital-markets activity supports financial-sector profitability.",
+          "The results reinforce the broader perception that financial markets are in a favorable phase.",
+          "Phase: EUPHORIA",
+          "Sectors impacted: Financials +6"
+        ]
       }
     },
     {
@@ -110,7 +152,14 @@
           "Financials": 4,
           "Real Estate": 4,
           "Infrastructure": 2
-        }
+        },
+        "brief_points": [
+          "Businesses and households continue to have relatively easy access to borrowing.",
+          "Ample credit supports investment, consumption and property purchases.",
+          "Investors view accessible financing as a sign that financial conditions remain supportive.",
+          "Phase: EUPHORIA",
+          "Sectors impacted: Financials +4, Real Estate +4, Infrastructure +2"
+        ]
       }
     },
     {
@@ -126,7 +175,14 @@
           "Energy": 5,
           "Metals": 5,
           "Industrials": 3
-        }
+        },
+        "brief_points": [
+          "Commodity prices rise as global demand remains strong.",
+          "Higher demand points to robust industrial and consumer activity around the world.",
+          "Commodity producers benefit, although higher input costs can eventually pressure other businesses.",
+          "Phase: EUPHORIA",
+          "Sectors impacted: Energy +5, Metals +5, Industrials +3"
+        ]
       }
     },
     {
@@ -141,7 +197,14 @@
         "sector_impacts": {
           "Financials": 3,
           "IT": 4
-        }
+        },
+        "brief_points": [
+          "Investor appetite for new listings remains strong, with the IPO market attracting significant demand.",
+          "Strong IPO participation suggests that investors are comfortable taking on additional risk.",
+          "The activity adds to the optimistic tone across equity markets.",
+          "Phase: EUPHORIA",
+          "Sectors impacted: IT +4, Financials +3"
+        ]
       }
     },
     {
@@ -161,7 +224,7 @@
         "total_lots": 800,
         "winning_lots": 200,
         "maximum_lots_per_user": 2,
-        "description": "Financial services IPO — issue price ₹765"
+        "description": "Financial services IPO \u2014 issue price \u20b9765"
       }
     },
     {
@@ -177,7 +240,14 @@
           "IT": 5,
           "Financials": 3,
           "Broad Market": 2
-        }
+        },
+        "brief_points": [
+          "A newly offered IPO receives far more investor demand than expected.",
+          "The strong response suggests that investors are willing to pay for growth despite valuation risks.",
+          "It reinforces the market's increasingly optimistic and speculative mood.",
+          "Phase: EUPHORIA",
+          "Sectors impacted: IT +5, Financials +3, Broad Market +2"
+        ]
       }
     },
     {
@@ -221,7 +291,7 @@
         "total_lots": 1000,
         "winning_lots": 250,
         "maximum_lots_per_user": 2,
-        "description": "Power / infrastructure IPO — issue price ₹450"
+        "description": "Power / infrastructure IPO \u2014 issue price \u20b9450"
       }
     },
     {
@@ -260,7 +330,14 @@
         "sector_impacts": {
           "Real Estate": -3,
           "Financials": -2
-        }
+        },
+        "brief_points": [
+          "Mortgage defaults begin to increase as some borrowers struggle to keep up with payments.",
+          "Rising defaults are an early sign that the housing boom is becoming less sustainable.",
+          "Lenders and investors with mortgage exposure face the first meaningful warning of losses.",
+          "Phase: CRACKS / DENIAL",
+          "Sectors impacted: Real Estate -3, Financials -2"
+        ]
       }
     },
     {
@@ -275,7 +352,14 @@
         "sector_impacts": {
           "Real Estate": -5,
           "Financials": -2
-        }
+        },
+        "brief_points": [
+          "Home prices begin falling after a prolonged period of rapid appreciation.",
+          "Declining prices make it harder for highly leveraged homeowners to refinance or sell without losses.",
+          "Banks, mortgage lenders and property-related companies become more exposed to downside risk.",
+          "Phase: CRACKS / DENIAL",
+          "Sectors impacted: Real Estate -5, Financials -2"
+        ]
       }
     },
     {
@@ -290,7 +374,14 @@
         "sector_impacts": {
           "Financials": -5,
           "Real Estate": -3
-        }
+        },
+        "brief_points": [
+          "Losses begin appearing in the subprime mortgage market as weaker borrowers default.",
+          "Mortgage-backed securities tied to these loans become harder to value.",
+          "Investors start questioning how widely the losses may be distributed across the financial system.",
+          "Phase: CRACKS / DENIAL",
+          "Sectors impacted: Financials -5, Real Estate -3"
+        ]
       }
     },
     {
@@ -304,7 +395,14 @@
       "payload": {
         "sector_impacts": {
           "Financials": -6
-        }
+        },
+        "brief_points": [
+          "Ratings agencies downgrade mortgage securities as the underlying loan quality deteriorates.",
+          "Lower ratings increase perceived risk and can force investors to reassess the value of these assets.",
+          "Financial institutions holding the securities face additional pressure on capital and confidence.",
+          "Phase: CRACKS / DENIAL",
+          "Sectors impacted: Financials -6"
+        ]
       }
     },
     {
@@ -318,7 +416,14 @@
       "payload": {
         "sector_impacts": {
           "Financials": -5
-        }
+        },
+        "brief_points": [
+          "Major hedge funds report significant losses linked to mortgage-related investments.",
+          "The losses show that housing weakness is affecting sophisticated investors beyond mortgage lenders.",
+          "Concerns grow that losses could spread through banks, funds and other financial institutions.",
+          "Phase: CRACKS / DENIAL",
+          "Sectors impacted: Financials -5"
+        ]
       }
     },
     {
@@ -333,7 +438,14 @@
         "sector_impacts": {
           "Financials": -5,
           "Broad Market": -2
-        }
+        },
+        "brief_points": [
+          "An international bank freezes funds connected to mortgage-related assets amid uncertainty over their value.",
+          "The move reflects growing difficulty in pricing and trading mortgage securities.",
+          "Investors begin to worry that liquidity problems could spread beyond the housing market.",
+          "Phase: CRACKS / DENIAL",
+          "Sectors impacted: Financials -5, Broad Market -2"
+        ]
       }
     },
     {
@@ -348,7 +460,14 @@
         "sector_impacts": {
           "Financials": 3,
           "Broad Market": 2
-        }
+        },
+        "brief_points": [
+          "Central banks provide emergency liquidity as funding conditions become increasingly strained.",
+          "The goal is to keep financial institutions supplied with cash and prevent a broader credit disruption.",
+          "The intervention offers short-term relief but also signals that authorities are becoming concerned about systemic risk.",
+          "Phase: CRACKS / DENIAL",
+          "Sectors impacted: Financials +3, Broad Market +2"
+        ]
       }
     },
     {
@@ -363,7 +482,14 @@
         "sector_impacts": {
           "Broad Market": 4,
           "Financials": 5
-        }
+        },
+        "brief_points": [
+          "Markets rebound after emergency intervention calms immediate funding concerns.",
+          "Investors respond positively to the prospect of stronger official support.",
+          "The recovery remains fragile because the underlying housing and credit problems have not disappeared.",
+          "Phase: CRACKS / DENIAL",
+          "Sectors impacted: Financials +5, Broad Market +4"
+        ]
       }
     },
     {
@@ -379,7 +505,14 @@
           "IT": 3,
           "Consumer": 2,
           "Industrials": 2
-        }
+        },
+        "brief_points": [
+          "Corporate earnings remain relatively strong even as financial-sector concerns increase.",
+          "Healthy profits provide some support for equities and suggest that the real economy has not yet fully weakened.",
+          "However, investors are increasingly focused on whether financial stress will eventually hit corporate demand.",
+          "Phase: CRACKS / DENIAL",
+          "Sectors impacted: IT +3, Consumer +2, Industrials +2"
+        ]
       }
     },
     {
@@ -399,7 +532,7 @@
         "total_lots": 800,
         "winning_lots": 200,
         "maximum_lots_per_user": 2,
-        "description": "Infrastructure IPO — issue price ₹110"
+        "description": "Infrastructure IPO \u2014 issue price \u20b9110"
       }
     },
     {
@@ -414,7 +547,14 @@
         "sector_impacts": {
           "IT": 6,
           "Financials": 2
-        }
+        },
+        "brief_points": [
+          "Demand for speculative IPOs surges even as early financial warning signs appear.",
+          "Investors continue to chase new growth opportunities and accept significant risk.",
+          "The behavior highlights how optimism can persist even while underlying market conditions begin deteriorating.",
+          "Phase: CRACKS / DENIAL",
+          "Sectors impacted: IT +6, Financials +2"
+        ]
       }
     },
     {
@@ -458,7 +598,7 @@
         "total_lots": 600,
         "winning_lots": 150,
         "maximum_lots_per_user": 2,
-        "description": "Manufacturing IPO — issue price ₹135"
+        "description": "Manufacturing IPO \u2014 issue price \u20b9135"
       }
     },
     {
@@ -497,7 +637,14 @@
         "sector_impacts": {
           "Financials": -7,
           "Broad Market": -3
-        }
+        },
+        "brief_points": [
+          "A major bank warns that credit-related losses may be much larger than previously expected.",
+          "The warning raises fresh questions about the strength of bank balance sheets.",
+          "Investors become more cautious as the potential scale of financial losses becomes harder to estimate.",
+          "Phase: CRACKS / DENIAL",
+          "Sectors impacted: Financials -7, Broad Market -3"
+        ]
       }
     },
     {
@@ -512,7 +659,14 @@
         "sector_impacts": {
           "Financials": 2,
           "Broad Market": 2
-        }
+        },
+        "brief_points": [
+          "Government officials reassure investors that the financial system remains stable.",
+          "The statement is intended to calm fears about banks and credit markets.",
+          "Confidence improves temporarily, although investors increasingly look for concrete evidence rather than reassurance alone.",
+          "Phase: CRACKS / DENIAL",
+          "Sectors impacted: Financials +2, Broad Market +2"
+        ]
       }
     },
     {
@@ -528,7 +682,14 @@
           "Real Estate": -8,
           "Financials": -5,
           "Consumer": -3
-        }
+        },
+        "brief_points": [
+          "Foreclosures rise sharply as more homeowners fall behind on mortgage payments.",
+          "More distressed properties enter the market, putting additional pressure on home prices.",
+          "Lenders face larger losses while housing-related businesses come under increasing strain.",
+          "Phase: CRASH",
+          "Sectors impacted: Real Estate -8, Financials -5, Consumer -3"
+        ]
       }
     },
     {
@@ -543,7 +704,14 @@
         "sector_impacts": {
           "Financials": -10,
           "Real Estate": -6
-        }
+        },
+        "brief_points": [
+          "A major mortgage lender fails as losses and funding pressures become unsustainable.",
+          "The failure demonstrates that housing problems are now threatening financial institutions directly.",
+          "Market participants begin looking for signs of similar weakness at other lenders.",
+          "Phase: CRASH",
+          "Sectors impacted: Financials -10, Real Estate -6"
+        ]
       }
     },
     {
@@ -559,7 +727,14 @@
           "Financials": -8,
           "Industrials": -4,
           "Consumer": -3
-        }
+        },
+        "brief_points": [
+          "Credit markets begin to freeze as banks become reluctant to lend amid uncertainty about counterparty risk.",
+          "Short-term funding becomes harder to obtain for banks and businesses.",
+          "The tightening creates a feedback loop in which less credit can further weaken economic activity.",
+          "Phase: CRASH",
+          "Sectors impacted: Financials -8, Industrials -4, Consumer -3"
+        ]
       }
     },
     {
@@ -574,7 +749,14 @@
         "sector_impacts": {
           "Financials": -10,
           "Broad Market": -4
-        }
+        },
+        "brief_points": [
+          "A major investment bank faces an acute liquidity crisis and struggles to secure funding.",
+          "Investors fear that another large financial institution could fail.",
+          "The episode sharply increases uncertainty across equity, credit and interbank markets.",
+          "Phase: CRASH",
+          "Sectors impacted: Financials -10, Broad Market -4"
+        ]
       }
     },
     {
@@ -589,7 +771,14 @@
         "sector_impacts": {
           "Financials": 4,
           "Broad Market": 2
-        }
+        },
+        "brief_points": [
+          "Central banks launch emergency measures to contain rapidly worsening financial stress.",
+          "Liquidity support is intended to keep key markets functioning and prevent disorderly failures.",
+          "The scale of intervention signals that the crisis has moved beyond the housing sector.",
+          "Phase: CRASH",
+          "Sectors impacted: Financials +4, Broad Market +2"
+        ]
       }
     },
     {
@@ -604,7 +793,14 @@
         "sector_impacts": {
           "Financials": -10,
           "Real Estate": -8
-        }
+        },
+        "brief_points": [
+          "Major mortgage-finance institutions come under severe pressure as losses continue to build.",
+          "Weakness at these institutions threatens both housing finance and broader credit availability.",
+          "Investors become increasingly concerned about the government's potential role in stabilizing them.",
+          "Phase: CRASH",
+          "Sectors impacted: Financials -10, Real Estate -8"
+        ]
       }
     },
     {
@@ -619,7 +815,14 @@
         "sector_impacts": {
           "Financials": -6,
           "Real Estate": -4
-        }
+        },
+        "brief_points": [
+          "The government announces emergency support for major mortgage-finance institutions.",
+          "The intervention aims to prevent further failures and preserve access to housing finance.",
+          "The move provides temporary stability but confirms the seriousness of the financial crisis.",
+          "Phase: CRASH",
+          "Sectors impacted: Financials -6, Real Estate -4"
+        ]
       }
     },
     {
@@ -634,7 +837,14 @@
         "sector_impacts": {
           "Financials": -12,
           "Broad Market": -6
-        }
+        },
+        "brief_points": [
+          "A major investment bank announces an emergency sale after coming under intense financial pressure.",
+          "An emergency transaction is viewed as preferable to an uncontrolled failure.",
+          "The episode reinforces fears that other highly leveraged financial firms may also be vulnerable.",
+          "Phase: CRASH",
+          "Sectors impacted: Financials -12, Broad Market -6"
+        ]
       }
     },
     {
@@ -653,7 +863,14 @@
           "Consumer": -5,
           "IT": -4,
           "Broad Market": -10
-        }
+        },
+        "brief_points": [
+          "Lehman Brothers files for bankruptcy in this fictional in-game event, marking a major shock.",
+          "The failure represents a sudden loss of confidence in a major financial institution.",
+          "The event accelerates the market panic and sharply increases pressure on credit and equity markets.",
+          "Phase: CRASH",
+          "Sectors impacted: Financials -15, Real Estate -10, Broad Market -10"
+        ]
       }
     },
     {
@@ -681,7 +898,14 @@
         "sector_impacts": {
           "Financials": -12,
           "Broad Market": -6
-        }
+        },
+        "brief_points": [
+          "AIG requires emergency government support after severe liquidity pressure develops.",
+          "Its exposure to mortgage-related assets and financial contracts makes its distress a systemic concern.",
+          "Official support is intended to prevent a disorderly failure from causing further damage to the financial system.",
+          "Phase: CRASH",
+          "Sectors impacted: Financials -12, Broad Market -6"
+        ]
       }
     },
     {
@@ -695,7 +919,14 @@
       "payload": {
         "sector_impacts": {
           "Financials": -8
-        }
+        },
+        "brief_points": [
+          "A major investment bank is acquired in an emergency transaction to prevent further disruption.",
+          "The deal removes one immediate source of systemic risk.",
+          "At the same time, the rescue confirms that normal market mechanisms are under severe strain.",
+          "Phase: CRASH",
+          "Sectors impacted: Financials -8"
+        ]
       }
     },
     {
@@ -710,7 +941,14 @@
         "sector_impacts": {
           "Financials": 4,
           "Broad Market": 3
-        }
+        },
+        "brief_points": [
+          "Authorities propose a large financial rescue package to stabilize banks and credit markets.",
+          "The proposal is aimed at removing distressed assets and restoring confidence in the financial system.",
+          "Investors view the intervention as a major test of whether policymakers can stop the crisis from spreading.",
+          "Phase: CRASH",
+          "Sectors impacted: Financials +4, Broad Market +3"
+        ]
       }
     },
     {
@@ -725,7 +963,14 @@
         "sector_impacts": {
           "Financials": 5,
           "Broad Market": 4
-        }
+        },
+        "brief_points": [
+          "The government approves an emergency financial rescue program.",
+          "The program provides support to troubled institutions and is designed to restore market liquidity and confidence.",
+          "The decision marks a major expansion of government involvement in stabilizing the financial system.",
+          "Phase: CRASH",
+          "Sectors impacted: Financials +5, Broad Market +4"
+        ]
       }
     },
     {
@@ -742,7 +987,14 @@
           "Financials": -15,
           "Industrials": -8,
           "Consumer": -7
-        }
+        },
+        "brief_points": [
+          "Global stock markets plunge as investors react to worsening financial and economic conditions.",
+          "Fear of bank failures, weaker earnings and recession drives broad-based selling.",
+          "The sell-off reflects a sharp shift from risk-taking toward capital preservation.",
+          "Phase: CRASH",
+          "Sectors impacted: Financials -15, Broad Market -12, Industrials -8"
+        ]
       }
     },
     {
@@ -758,7 +1010,14 @@
           "Industrials": -7,
           "Consumer": -6,
           "Financials": -8
-        }
+        },
+        "brief_points": [
+          "The recession deepens as financial stress begins weighing heavily on businesses and households.",
+          "Tighter credit and weaker demand reduce investment, employment and consumer activity.",
+          "Investors expect corporate profits to remain under pressure for an extended period.",
+          "Phase: CRASH",
+          "Sectors impacted: Financials -8, Industrials -7, Consumer -6"
+        ]
       }
     },
     {
@@ -775,7 +1034,14 @@
           "IT": -5,
           "Consumer": -6,
           "Industrials": -7
-        }
+        },
+        "brief_points": [
+          "Major companies report severe declines in earnings as demand weakens.",
+          "Falling profits reinforce concerns that the crisis is spreading from finance into the real economy.",
+          "Equity valuations come under further pressure as earnings expectations are revised lower.",
+          "Phase: CRASH",
+          "Sectors impacted: Industrials -7, Broad Market -6, Consumer -6"
+        ]
       }
     },
     {
@@ -791,7 +1057,14 @@
           "Consumer": -8,
           "Automobiles": -7,
           "Financials": -4
-        }
+        },
+        "brief_points": [
+          "Consumer confidence reaches a multi-year low as households become increasingly worried about the economy.",
+          "Lower confidence can lead to delayed purchases and weaker discretionary spending.",
+          "Consumer-facing companies face additional pressure as the downturn becomes more visible.",
+          "Phase: CRASH",
+          "Sectors impacted: Consumer -8, Automobiles -7, Financials -4"
+        ]
       }
     },
     {
@@ -807,7 +1080,14 @@
           "Financials": -8,
           "Industrials": -5,
           "Real Estate": -6
-        }
+        },
+        "brief_points": [
+          "Credit conditions remain severely restricted despite earlier rescue measures.",
+          "Businesses and financial institutions continue to face difficulty securing affordable funding.",
+          "The lack of credit slows investment and makes a quick economic recovery less likely.",
+          "Phase: CRASH",
+          "Sectors impacted: Financials -8, Real Estate -6, Industrials -5"
+        ]
       }
     },
     {
@@ -822,7 +1102,14 @@
         "sector_impacts": {
           "Financials": 4,
           "Broad Market": 3
-        }
+        },
+        "brief_points": [
+          "Central banks coordinate emergency liquidity measures to support financial institutions and credit markets.",
+          "The coordinated response is intended to restore confidence and reduce funding stress.",
+          "Investors begin to see stronger policy action as a potential foundation for stabilization.",
+          "Phase: RECOVERY",
+          "Sectors impacted: Financials +4, Broad Market +3"
+        ]
       }
     },
     {
@@ -839,7 +1126,14 @@
           "Real Estate": 5,
           "Industrials": 3,
           "Consumer": 3
-        }
+        },
+        "brief_points": [
+          "Interest rates are cut toward emergency levels to encourage borrowing and economic activity.",
+          "Lower rates reduce financing costs for households and businesses.",
+          "The move is designed to support demand and improve conditions in stressed credit markets.",
+          "Phase: RECOVERY",
+          "Sectors impacted: Financials +6, Real Estate +5, Industrials +3"
+        ]
       }
     },
     {
@@ -855,7 +1149,14 @@
           "Financials": 6,
           "Industrials": 4,
           "Infrastructure": 5
-        }
+        },
+        "brief_points": [
+          "Government authorities expand financial support as stabilization efforts continue.",
+          "Additional measures aim to strengthen institutions and prevent renewed financial stress.",
+          "The expanding policy response begins to improve expectations for a gradual recovery.",
+          "Phase: RECOVERY",
+          "Sectors impacted: Financials +6, Infrastructure +5, Industrials +4"
+        ]
       }
     },
     {
@@ -870,7 +1171,14 @@
         "sector_impacts": {
           "Real Estate": 7,
           "Financials": 4
-        }
+        },
+        "brief_points": [
+          "Housing markets show early signs of stabilization after a prolonged decline.",
+          "Falling prices and activity begin to level out, reducing fears of an accelerating housing collapse.",
+          "The improvement provides a positive signal for lenders, property companies and the wider economy.",
+          "Phase: RECOVERY",
+          "Sectors impacted: Real Estate +7, Financials +4"
+        ]
       }
     },
     {
@@ -886,7 +1194,14 @@
           "Industrials": 6,
           "Metals": 6,
           "Energy": 5
-        }
+        },
+        "brief_points": [
+          "The contraction in industrial activity begins to slow.",
+          "The change suggests that the sharpest part of the economic downturn may be passing.",
+          "Investors begin looking for evidence that corporate demand and production can recover.",
+          "Phase: RECOVERY",
+          "Sectors impacted: Industrials +6, Metals +6, Energy +5"
+        ]
       }
     },
     {
@@ -901,7 +1216,14 @@
         "sector_impacts": {
           "Consumer": 5,
           "Automobiles": 5
-        }
+        },
+        "brief_points": [
+          "Consumer confidence stabilizes after a prolonged period of deterioration.",
+          "Households appear less pessimistic about future economic conditions.",
+          "A stabilization in sentiment can be an early step toward a recovery in consumer spending.",
+          "Phase: RECOVERY",
+          "Sectors impacted: Consumer +5, Automobiles +5"
+        ]
       }
     },
     {
@@ -921,7 +1243,7 @@
         "total_lots": 500,
         "winning_lots": 150,
         "maximum_lots_per_user": 2,
-        "description": "Industrial minerals IPO — issue price ₹55"
+        "description": "Industrial minerals IPO \u2014 issue price \u20b955"
       }
     },
     {
@@ -963,7 +1285,14 @@
           "IT": 7,
           "Industrials": 7,
           "Consumer": 6
-        }
+        },
+        "brief_points": [
+          "Stock markets stage a major recovery rally as investors respond to improving conditions and policy support.",
+          "Risk appetite returns as fears of an uncontrolled financial collapse recede.",
+          "The rally marks a major shift from crisis-driven selling toward expectations of stabilization and recovery.",
+          "Phase: RECOVERY",
+          "Sectors impacted: Broad Market +8, Financials +7, IT +7"
+        ]
       }
     },
     {

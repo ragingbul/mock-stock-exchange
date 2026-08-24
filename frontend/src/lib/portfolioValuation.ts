@@ -1,4 +1,5 @@
 import { num } from "@/lib/marketFormat";
+import type { EnrichedHolding, HoldingDetail } from "@/lib/api";
 
 export type WalletSnapshot = {
   available_cash: string;
@@ -52,4 +53,30 @@ export function markWalletToMarket(
     total_pnl: totalPnl.toFixed(2),
     return_pct: returnPct.toFixed(4),
   };
+}
+
+/** Live mark-to-market per holding row for wallet panel. */
+export function markHoldingsToMarket(
+  holdings: HoldingDetail[],
+  stocks: PricedStock[],
+): EnrichedHolding[] {
+  const priceByTicker = new Map(stocks.map((s) => [s.ticker, num(s.last_traded_price)]));
+
+  return holdings
+    .filter((h) => h.quantity > 0)
+    .map((h) => {
+      const ltp = h.ticker ? (priceByTicker.get(h.ticker) ?? num(h.market_price)) : num(h.market_price);
+      const avg = num(h.avg_cost);
+      const marketValue = h.quantity * ltp;
+      const costBasis = h.quantity * avg;
+      const unrealized = marketValue - costBasis;
+      const returnPct = costBasis > 0 ? ((marketValue - costBasis) / costBasis) * 100 : 0;
+      return {
+        ...h,
+        market_price: ltp.toFixed(2),
+        market_value: marketValue.toFixed(2),
+        unrealized_pnl: unrealized.toFixed(2),
+        return_pct: returnPct.toFixed(4),
+      };
+    });
 }

@@ -6,6 +6,7 @@ import type { PricePoint } from "@/hooks/usePriceChart";
 import { fmtPct, num, signClass } from "@/lib/marketFormat";
 import type { SidebarStock } from "./StockSidebar";
 
+export const MAX_POSITION_PER_STOCK = 100;
 const UP = "#22c55e";
 const DOWN = "#ef4444";
 
@@ -129,11 +130,14 @@ export function TradePanel({
           <input
             type="number"
             min={1}
+            max={Math.max(1, MAX_POSITION_PER_STOCK - holdingQty)}
             className={`${inputCls} mt-1`}
             value={qty}
-            onChange={(e) => onQtyChange(Number(e.target.value))}
+            onChange={(e) => onQtyChange(Math.min(Number(e.target.value), MAX_POSITION_PER_STOCK - holdingQty))}
           />
-          <p className="mt-1 text-[10px] text-white/40">Holding: {holdingQty}</p>
+          <p className="mt-1 text-[10px] text-white/40">
+            Holding: {holdingQty} / {MAX_POSITION_PER_STOCK} max
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-2">

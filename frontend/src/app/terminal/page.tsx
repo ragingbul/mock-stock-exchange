@@ -2,19 +2,33 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BreakingNewsAlert } from "@/components/BreakingNewsAlert";
+import { LatestNewsPanel } from "@/components/LatestNewsPanel";
 import type { NewsItem } from "@/components/NewsPanel";
 import { Leaderboard, type LeaderboardRow } from "@/components/Leaderboard";
 import { StockSidebar, type SectorGroup, type SidebarStock } from "@/components/StockSidebar";
-import { TradePanel } from "@/components/TradePanel";
+import { TradePanel, MAX_POSITION_PER_STOCK } from "@/components/TradePanel";
 import { WalletBar } from "@/components/WalletBar";
+import { WalletPanel } from "@/components/WalletPanel";
 import { useMarketWebSocket } from "@/hooks/useMarketWebSocket";
 import {
   usePriceChart,
   type MarketPulseStock,
   type PriceUpdatePayload,
 } from "@/hooks/usePriceChart";
-import { apiGet, apiPost, fetchSessionBootstrap, joinSession } from "@/lib/api";
 import {
+  apiGet,
+  apiPost,
+  fetchOrders,
+  fetchPortfolio,
+  fetchSessionBootstrap,
+  fetchTrades,
+  joinSession,
+  mergeTransactions,
+  type PortfolioDetail,
+  type TransactionRow,
+} from "@/lib/api";
+import {
+  markHoldingsToMarket,
   markWalletToMarket,
   type PortfolioSnapshot,
   type WalletSnapshot,
@@ -46,10 +60,15 @@ function newsFromPayload(raw: Record<string, unknown> | undefined): NewsItem | n
   if (!raw) return null;
   const title = String(raw.title ?? raw.headline ?? "").trim();
   if (!title) return null;
+  const briefRaw = raw.brief_points;
+  const brief_points = Array.isArray(briefRaw)
+    ? briefRaw.map((p) => String(p))
+    : undefined;
   return {
     id: Number(raw.id ?? 0),
     title,
     description: String(raw.description ?? ""),
+    brief_points,
     released_at: raw.released_at ? String(raw.released_at) : undefined,
   };
 }
@@ -66,6 +85,11 @@ export default function TerminalPage() {
   const [newsFeed, setNewsFeed] = useState<NewsItem[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
   const [showLb, setShowLb] = useState(false);
+  const [showWallet, setShowWallet] = useState(false);
+  const [portfolioDetail, setPortfolioDetail] = useState<PortfolioDetail | null>(null);
+  const [transactions, setTransactions] = useState<TransactionRow[]>([]);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [selectedNewsId, setSelectedNewsId] = useState<number | null>(null);
   const [ipos, setIpos] = useState<IPO[]>([]);
   const [ipoLots, setIpoLots] = useState(1);
   const [qty, setQty] = useState(10);
@@ -91,6 +115,18 @@ export default function TerminalPage() {
     () => markWalletToMarket(wallet, portfolio, stocks),
     [wallet, portfolio, stocks],
   );
+
+  const liveHoldings = useMemo(
+    () => markHoldingsToMarket(portfolioDetail?.holdings ?? [], stocks),
+    [portfolioDetail, stocks],
+  );
+
+  const selectedNews = useMemo(() => {
+    if (selectedNewsId != null) {
+      return newsFeed.find((n) => n.id === selectedNewsId) ?? newsFeed[0] ?? breaking;
+    }
+    return newsFeed[0] ?? breaking;
+  }, [newsFeed, breaking, selectedNewsId]);
 
   const holdingQty = useMemo(() => {
     if (!selected || !portfolio) return 0;
@@ -216,6 +252,7 @@ export default function TerminalPage() {
           id: n.id,
           title: n.title,
           description: n.description ?? "",
+          brief_points: n.brief_points,
           released_at: n.released_at,
         }));
         setNewsFeed(items);
@@ -239,6 +276,26 @@ export default function TerminalPage() {
       setPortfolio(null);
     }
   }, [applyBootstrap]);
+
+  const refreshWalletDetail = useCallback(async (explicitTraderId?: number) => {
+    const id = explicitTraderId ?? traderId;
+    if (!id) return;
+    setWalletLoading(true);
+    try {
+      const [detail, orders, trades] = await Promise.all([
+        fetchPortfolio(id),
+        fetchOrders(),
+        fetchTrades(),
+      ]);
+      setPortfolioDetail(detail);
+      const tickerMap = new Map(stocks.map((s) => [s.id, s.ticker]));
+      setTransactions(mergeTransactions(orders, trades, tickerMap));
+    } catch {
+      /* wallet panel is optional */
+    } finally {
+      setWalletLoading(false);
+    }
+  }, [traderId, stocks]);
 
   const refreshWallet = useCallback(async (explicitTraderId?: number) => {
     const id = explicitTraderId ?? traderId;
@@ -267,6 +324,9 @@ export default function TerminalPage() {
         cash_blocked_ipo: p.cash_blocked_ipo != null ? asMoney(p.cash_blocked_ipo) : undefined,
       });
       setLeaderboard(lb);
+      if (showWallet) {
+        void refreshWalletDetail(id);
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : "";
       if (message.toLowerCase().includes("401") || message.toLowerCase().includes("unauthor")) {
@@ -275,7 +335,7 @@ export default function TerminalPage() {
         setTraderId(null);
       }
     }
-  }, [traderId]);
+  }, [traderId, showWallet, refreshWalletDetail]);
 
   const refresh = useCallback(async () => {
     try {
@@ -291,6 +351,7 @@ export default function TerminalPage() {
             id: n.id,
             title: n.title,
             description: n.description ?? "",
+            brief_points: n.brief_points,
             released_at: n.released_at,
           })),
         );
@@ -313,6 +374,12 @@ export default function TerminalPage() {
       void resyncBootstrap();
     }
   }, [resyncBootstrap]);
+
+  useEffect(() => {
+    if (showWallet && traderId) {
+      void refreshWalletDetail(traderId);
+    }
+  }, [showWallet, traderId, refreshWalletDetail]);
 
   useEffect(() => {
     if (!breaking) return;
@@ -401,6 +468,10 @@ export default function TerminalPage() {
 
   function openConfirm(side: "buy" | "sell") {
     setConfirmError(null);
+    if (side === "buy" && holdingQty + qty > MAX_POSITION_PER_STOCK) {
+      setToast(`Max ${MAX_POSITION_PER_STOCK} shares per stock (you hold ${holdingQty})`);
+      return;
+    }
     setConfirmSide(side);
   }
 
@@ -451,7 +522,6 @@ export default function TerminalPage() {
   }
 
   const inputCls = "w-full border border-white/25 bg-black px-2 py-2 text-white outline-none";
-  const latestNews = newsFeed[0] ?? breaking;
 
   if (!traderId) {
     return (
@@ -476,6 +546,8 @@ export default function TerminalPage() {
         portfolio={displayWallet?.portfolio_value}
         pnl={displayWallet?.total_pnl}
         ret={displayWallet?.return_pct}
+        onWallet={() => setShowWallet((v) => !v)}
+        showWallet={showWallet}
         onLeaderboard={() => setShowLb((v) => !v)}
         showLeaderboard={showLb}
       />
@@ -489,14 +561,12 @@ export default function TerminalPage() {
         </span>
       </div>
 
-      {latestNews && (
-        <div className="border-b border-[#ef4444]/40 bg-[#ef4444]/10 px-3 py-2 sm:px-4">
-          <p className="text-[10px] uppercase tracking-wider text-[#ef4444]">Latest news</p>
-          <p className="mt-1 text-sm leading-snug">{latestNews.title}</p>
-          {latestNews.description && (
-            <p className="mt-1 line-clamp-2 text-xs text-white/60">{latestNews.description}</p>
-          )}
-        </div>
+      {selectedNews && (
+        <LatestNewsPanel
+          newsFeed={newsFeed}
+          selected={selectedNews}
+          onSelect={(item) => setSelectedNewsId(item.id)}
+        />
       )}
 
       <BreakingNewsAlert news={breaking} onDismiss={() => setBreaking(null)} />
@@ -529,6 +599,15 @@ export default function TerminalPage() {
           onIpoApply={ipos[0] ? applyIpo : undefined}
         />
       </div>
+
+      {showWallet && (
+        <WalletPanel
+          portfolio={portfolioDetail}
+          holdings={liveHoldings}
+          transactions={transactions}
+          loading={walletLoading}
+        />
+      )}
 
       {showLb && (
         <div className="border-t border-white/15 p-4">
