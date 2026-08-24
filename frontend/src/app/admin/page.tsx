@@ -95,7 +95,7 @@ export default function AdminPage() {
     refreshNews();
     const id = setInterval(() => {
       refreshStatus({ includeCheckpoints: false, quiet: true });
-    }, 8000);
+    }, 15000);
     return () => clearInterval(id);
   }, [refreshStatus, refreshNews, adminToken]);
 

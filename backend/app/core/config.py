@@ -64,7 +64,7 @@ class Settings(BaseSettings):
         validation_alias="ADMIN_SECRET",
     )
     auth_token_expire_minutes: int = 60 * 12
-    rate_limit_per_minute: int = Field(default=600, validation_alias="RATE_LIMIT_PER_MINUTE")
+    rate_limit_per_minute: int = Field(default=1200, validation_alias="RATE_LIMIT_PER_MINUTE")
 
     # Market defaults (used from Phase 1 onward)
     default_starting_capital: float = 1_000_000.0
