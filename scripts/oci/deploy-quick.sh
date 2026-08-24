@@ -25,36 +25,46 @@ echo "    IP: ${PUBLIC_IP}"
 echo "    Dir: ${INSTALL_DIR}"
 
 if ! command -v docker >/dev/null 2>&1; then
-  echo "ERROR: docker not found. Install Docker first." >&2
-  exit 1
-fi
-
-if ! docker compose version >/dev/null 2>&1 && ! docker-compose version >/dev/null 2>&1; then
-  echo "ERROR: docker compose not found." >&2
-  exit 1
-fi
-
-# Ensure user can run docker (opc often needs group or newgrp)
-if ! docker ps >/dev/null 2>&1; then
-  echo "==> Adding $(whoami) to docker group (may need re-login)"
-  sudo usermod -aG docker "$(whoami)" || true
-  if ! sg docker -c "docker ps" >/dev/null 2>&1; then
-    echo "WARN: run 'newgrp docker' or re-SSH, then re-run this script" >&2
-    DOCKER="sudo docker"
+  if sudo command -v docker >/dev/null 2>&1; then
+    echo "==> docker found via sudo; using sudo for docker commands"
+    shopt -s expand_aliases
+    alias docker='sudo docker'
+    export DOCKER_SUDO=1
   else
-    DOCKER="sg docker -c"
+    echo "ERROR: docker not found. Install Docker first:" >&2
+    echo "  curl -fsSL https://get.docker.com | sudo sh" >&2
+    echo "  sudo usermod -aG docker \$(whoami) && newgrp docker" >&2
+    exit 1
   fi
-else
-  DOCKER=""
 fi
 
-run_docker() {
-  if [[ -n "$DOCKER" ]]; then
-    sg docker -c "$*"
+docker_cmd() {
+  if [[ "${DOCKER_SUDO:-}" == "1" ]]; then
+    sudo docker "$@"
   else
-    eval "$@"
+    docker "$@"
   fi
 }
+
+if ! docker_cmd compose version >/dev/null 2>&1 && ! docker_cmd-compose version >/dev/null 2>&1; then
+  echo "ERROR: docker compose not found. On Oracle Linux try:" >&2
+  echo "  sudo dnf install -y docker-compose-plugin" >&2
+  exit 1
+fi
+
+# Ensure user can run docker without sudo when possible
+if ! docker_cmd ps >/dev/null 2>&1; then
+  echo "==> Adding $(whoami) to docker group"
+  sudo usermod -aG docker "$(whoami)" || true
+  if groups | grep -q docker && docker ps >/dev/null 2>&1; then
+    :
+  elif sudo docker ps >/dev/null 2>&1; then
+    export DOCKER_SUDO=1
+    echo "==> Using sudo docker for this session"
+  else
+    echo "WARN: run 'newgrp docker' or re-SSH, then re-run this script" >&2
+  fi
+fi
 
 if [[ ! -d "${INSTALL_DIR}/.git" ]]; then
   echo "==> Cloning repository"
