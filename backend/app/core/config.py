@@ -88,6 +88,7 @@ class Settings(BaseSettings):
 
     ai_tick_min_sec: float = 15.0
     ai_tick_max_sec: float = 30.0
+    ai_max_actions_per_tick: int = Field(default=30, validation_alias="AI_MAX_ACTIONS_PER_TICK")
     news_impact_tolerance_pct: float = 0.5
     news_combined_impact_cap_pct: float = 20.0
 

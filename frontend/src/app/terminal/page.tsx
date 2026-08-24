@@ -476,9 +476,9 @@ export default function TerminalPage() {
   }
 
   function closeConfirm() {
-    if (confirmLoading) return;
     setConfirmSide(null);
     setConfirmError(null);
+    setConfirmLoading(false);
   }
 
   async function executeOrder() {

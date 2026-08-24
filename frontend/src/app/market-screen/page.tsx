@@ -35,14 +35,18 @@ export default function MarketScreenPage() {
   const [news, setNews] = useState<NewsItem[]>([]);
 
   const refresh = useCallback(async () => {
-    const [st, sec, nw] = await Promise.all([
-      apiGet<MarketStatus>("/market/status"),
-      apiGet<SectorGroup[]>("/market/sectors"),
-      apiGet<NewsItem[]>("/news"),
-    ]);
-    setStatus(st);
-    setSectors(sec);
-    setNews(nw);
+    try {
+      const [st, sec, nw] = await Promise.all([
+        apiGet<MarketStatus>("/market/status"),
+        apiGet<SectorGroup[]>("/market/sectors"),
+        apiGet<NewsItem[]>("/news"),
+      ]);
+      setStatus(st);
+      setSectors(sec);
+      setNews(nw);
+    } catch {
+      /* keep last good snapshot if API is briefly unavailable */
+    }
   }, []);
 
   useEffect(() => {
@@ -53,6 +57,20 @@ export default function MarketScreenPage() {
 
   useMarketWebSocket({
     onMessage: (msg) => {
+      if (msg.event === "SIMULATION_CLOCK" || msg.event === "SIMULATION_STATUS") {
+        const payload = (msg.payload ?? msg) as {
+          elapsed?: string;
+          current_phase?: string;
+          status?: string;
+        };
+        setStatus((prev) => ({
+          elapsed: payload.elapsed ?? prev?.elapsed ?? "00:00:00",
+          current_phase: payload.current_phase ?? prev?.current_phase ?? "—",
+          status: payload.status ?? prev?.status ?? "unknown",
+          market_change_pct: prev?.market_change_pct ?? "0",
+          latest_news: prev?.latest_news ?? null,
+        }));
+      }
       if (
         msg.event === "NEWS_RELEASED" ||
         msg.event === "PRICE_UPDATED" ||

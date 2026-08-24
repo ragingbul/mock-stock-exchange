@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import select, text
@@ -24,13 +25,18 @@ logger = logging.getLogger(__name__)
 _task: asyncio.Task | None = None
 _stop = asyncio.Event()
 _lock_conn: Connection | None = None
-AI_TICK_INTERVAL_SEC = 30.0
-CLOCK_BROADCAST_INTERVAL = 10.0
+AI_TICK_INTERVAL_SEC = 45.0
+CLOCK_BROADCAST_INTERVAL = 5.0
 MARKET_PULSE_INTERVAL_REAL = 1.0
 _last_clock_broadcast = 0.0
 _last_market_pulse_real = 0.0
 _market_pulse_seq = 0
 ADVISORY_LOCK_ID = 8675309
+
+
+@dataclass
+class TickResult:
+    broadcasts: list[tuple[str, dict[str, Any]]]
 
 
 def reset_market_pulse_clock(sim_elapsed: float = 0.0) -> None:
@@ -77,44 +83,86 @@ async def _broadcast_messages(messages: list[tuple[str, dict[str, Any]]]) -> Non
         await manager.broadcast(event, payload)
 
 
-async def _maybe_run_ai_tick(elapsed: float) -> None:
-    try:
-        with SessionLocal() as db:
-            settings = get_or_create_settings(db)
-            if not settings.simulation_ai_enabled:
-                return
-            state = get_or_create_state(db)
-            if elapsed - float(state.last_ai_tick_elapsed_sec) < AI_TICK_INTERVAL_SEC:
-                return
-            results = _run_ai_tick(db, elapsed)
-            messages = _ai_broadcast_messages(db, elapsed, results)
-        logger.info("AI tick at sim=%.0fs: %s actions", elapsed, len(results))
-        await _broadcast_messages(messages)
-    except Exception:  # noqa: BLE001
-        logger.exception("AI tick failed — simulation continues")
+def _run_tick_sync(delta: float, now_real: float) -> TickResult | None:
+    """Blocking simulation work — runs in a thread pool so HTTP handlers stay responsive."""
+    global _last_clock_broadcast, _last_market_pulse_real, _market_pulse_seq
 
+    pending_broadcasts: list[tuple[str, dict[str, Any]]] = []
 
-async def _immediate_news_reaction(elapsed: float) -> None:
-    """Pulse liquidity and run AI immediately after a timeline NEWS event."""
-    try:
-        with SessionLocal() as db:
-            settings = get_or_create_settings(db)
-            if not settings.simulation_ai_enabled:
-                return
-            from app.services.liquidity_service import provision_two_sided_quotes
+    with SessionLocal() as db:
+        state = get_or_create_state(db)
+        if state.status != SimulationStatus.RUNNING:
+            return None
 
-            stocks = list(db.scalars(select(Stock).where(Stock.is_open.is_(True))).all())
-            for stock in stocks:
+        elapsed = advance_clock(db, delta)
+        state = get_or_create_state(db)
+
+        event_results = process_due_events(db, elapsed)
+        for er in event_results:
+            etype = er.get("type")
+            logger.info(
+                "Timeline event executed: type=%s headline=%s",
+                etype,
+                er.get("headline") or er.get("checkpoint_id"),
+            )
+            if etype == "NEWS":
+                detail = er.get("broadcast")
+                if detail:
+                    pending_broadcasts.append(("NEWS_RELEASED", detail))
+            elif etype == "IPO_OPEN":
+                logger.info("IPO EVENT: open ticker=%s", er.get("ticker"))
+                pending_broadcasts.append(("IPO_OPENED", er))
+            elif etype == "IPO_ALLOTMENT":
+                logger.info("IPO EVENT: allotment ipo_id=%s", er.get("ipo_id"))
+                pending_broadcasts.append(("IPO_RESULT", er))
+            elif etype == "IPO_LISTING":
+                logger.info("IPO EVENT: listing ticker=%s", er.get("ticker"))
+                pending_broadcasts.append(("IPO_LISTED", er))
+            elif etype == "COMPANY_DISSOLUTION":
+                logger.info("DISSOLUTION EVENT: %s", er)
+                pending_broadcasts.append(("COMPANY_DISSOLVED", er))
+            elif etype == "SIMULATION_END":
+                pending_broadcasts.append(("SIMULATION_STATUS", status_dict(db)))
+
+        settings = get_or_create_settings(db)
+        state = get_or_create_state(db)
+
+        if settings.simulation_ai_enabled:
+            if elapsed - float(state.last_ai_tick_elapsed_sec) >= AI_TICK_INTERVAL_SEC:
                 try:
-                    provision_two_sided_quotes(db, stock)
+                    results = _run_ai_tick(db, elapsed)
+                    pending_broadcasts.extend(_ai_broadcast_messages(db, elapsed, results))
+                    logger.info("AI tick at sim=%.0fs: %s actions", elapsed, len(results))
                 except Exception:  # noqa: BLE001
-                    logger.debug("MM quote refresh failed for %s", stock.ticker, exc_info=True)
-            results = _run_ai_tick(db, elapsed)
-            messages = _ai_broadcast_messages(db, elapsed, results)
-        logger.info("Immediate news AI tick at sim=%.0fs: %s actions", elapsed, len(results))
-        await _broadcast_messages(messages)
-    except Exception:  # noqa: BLE001
-        logger.exception("Immediate news AI tick failed — simulation continues")
+                    logger.exception("AI tick failed — simulation continues")
+
+        if elapsed >= float(state.sim_duration_sec) and state.status == SimulationStatus.RUNNING:
+            state.status = SimulationStatus.COMPLETED
+            session_pause(db)
+            db.commit()
+            logger.info("Simulation completed at sim=%.0fs", elapsed)
+            pending_broadcasts.append(("SIMULATION_STATUS", status_dict(db)))
+            return TickResult(broadcasts=pending_broadcasts)
+
+        if elapsed - _last_clock_broadcast >= CLOCK_BROADCAST_INTERVAL:
+            _last_clock_broadcast = elapsed
+            pending_broadcasts.append(("SIMULATION_CLOCK", status_dict(db)))
+
+        if (
+            state.status == SimulationStatus.RUNNING
+            and now_real - _last_market_pulse_real >= MARKET_PULSE_INTERVAL_REAL
+        ):
+            _last_market_pulse_real = now_real
+            _market_pulse_seq += 1
+            pulse_updates = run_market_pulse(
+                db, float(state.sim_elapsed_sec), pulse_seq=_market_pulse_seq
+            )
+            if pulse_updates:
+                pending_broadcasts.append(
+                    ("MARKET_PULSE", {"stocks": pulse_updates, "elapsed_sec": elapsed})
+                )
+
+    return TickResult(broadcasts=pending_broadcasts)
 
 
 def _acquire_advisory_lock() -> bool:
@@ -161,7 +209,6 @@ def _release_advisory_lock() -> None:
 
 
 async def _loop() -> None:
-    global _last_clock_broadcast, _last_market_pulse_real, _market_pulse_seq
     if not _acquire_advisory_lock():
         return
 
@@ -174,90 +221,16 @@ async def _loop() -> None:
             delta = now_real - last_real
             last_real = now_real
 
-            pending_broadcasts: list[tuple[str, dict[str, Any]]] = []
-            news_reactions: list[float] = []
-            ai_tick_elapsed: float | None = None
-            completed = False
-
             try:
-                with SessionLocal() as db:
-                    state = get_or_create_state(db)
-                    if state.status != SimulationStatus.RUNNING:
-                        continue
-
-                    elapsed = advance_clock(db, delta)
-                    state = get_or_create_state(db)
-
-                    event_results = process_due_events(db, elapsed)
-                    for er in event_results:
-                        etype = er.get("type")
-                        logger.info(
-                            "Timeline event executed: type=%s headline=%s",
-                            etype,
-                            er.get("headline") or er.get("checkpoint_id"),
-                        )
-                        if etype == "NEWS":
-                            detail = er.get("broadcast")
-                            if detail:
-                                pending_broadcasts.append(("NEWS_RELEASED", detail))
-                            news_reactions.append(elapsed)
-                        elif etype == "IPO_OPEN":
-                            logger.info("IPO EVENT: open ticker=%s", er.get("ticker"))
-                            pending_broadcasts.append(("IPO_OPENED", er))
-                        elif etype == "IPO_ALLOTMENT":
-                            logger.info("IPO EVENT: allotment ipo_id=%s", er.get("ipo_id"))
-                            pending_broadcasts.append(("IPO_RESULT", er))
-                        elif etype == "IPO_LISTING":
-                            logger.info("IPO EVENT: listing ticker=%s", er.get("ticker"))
-                            pending_broadcasts.append(("IPO_LISTED", er))
-                        elif etype == "COMPANY_DISSOLUTION":
-                            logger.info("DISSOLUTION EVENT: %s", er)
-                            pending_broadcasts.append(("COMPANY_DISSOLVED", er))
-                        elif etype == "SIMULATION_END":
-                            pending_broadcasts.append(("SIMULATION_STATUS", status_dict(db)))
-
-                    settings = get_or_create_settings(db)
-                    state = get_or_create_state(db)
-                    if settings.simulation_ai_enabled:
-                        if elapsed - float(state.last_ai_tick_elapsed_sec) >= AI_TICK_INTERVAL_SEC:
-                            ai_tick_elapsed = elapsed
-
-                    if elapsed >= float(state.sim_duration_sec) and state.status == SimulationStatus.RUNNING:
-                        state.status = SimulationStatus.COMPLETED
-                        session_pause(db)
-                        db.commit()
-                        logger.info("Simulation completed at sim=%.0fs", elapsed)
-                        pending_broadcasts.append(("SIMULATION_STATUS", status_dict(db)))
-                        completed = True
-
-                    if not completed and elapsed - _last_clock_broadcast >= CLOCK_BROADCAST_INTERVAL:
-                        _last_clock_broadcast = elapsed
-                        pending_broadcasts.append(("SIMULATION_CLOCK", status_dict(db)))
-
-                    if (
-                        not completed
-                        and state.status == SimulationStatus.RUNNING
-                        and now_real - _last_market_pulse_real >= MARKET_PULSE_INTERVAL_REAL
-                    ):
-                        _last_market_pulse_real = now_real
-                        _market_pulse_seq += 1
-                        pulse_updates = run_market_pulse(
-                            db, float(state.sim_elapsed_sec), pulse_seq=_market_pulse_seq
-                        )
-                        if pulse_updates:
-                            pending_broadcasts.append(
-                                ("MARKET_PULSE", {"stocks": pulse_updates, "elapsed_sec": elapsed})
-                            )
-
+                tick_result = await asyncio.to_thread(_run_tick_sync, delta, now_real)
             except Exception:  # noqa: BLE001
                 logger.exception("Simulation engine tick failed")
                 continue
 
-            await _broadcast_messages(pending_broadcasts)
-            for reaction_elapsed in news_reactions:
-                await _immediate_news_reaction(reaction_elapsed)
-            if ai_tick_elapsed is not None:
-                await _maybe_run_ai_tick(ai_tick_elapsed)
+            if tick_result is None:
+                continue
+
+            await _broadcast_messages(tick_result.broadcasts)
     finally:
         _release_advisory_lock()
         logger.info("Simulation engine loop stopped")
