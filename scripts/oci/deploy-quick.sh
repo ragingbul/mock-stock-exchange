@@ -25,10 +25,15 @@ echo "    IP: ${PUBLIC_IP}"
 echo "    Dir: ${INSTALL_DIR}"
 
 if ! command -v docker >/dev/null 2>&1 && ! sudo command -v docker >/dev/null 2>&1; then
-  echo "==> Docker not found — installing..."
-  curl -fsSL https://get.docker.com | sudo sh
-  sudo systemctl enable --now docker
-  sudo usermod -aG docker "$(whoami)"
+  echo "==> Docker not found — installing for Oracle Linux..."
+  INSTALL_DOCKER="$(mktemp)"
+  curl -fsSL "https://raw.githubusercontent.com/ragingbul/mock-stock-exchange/${BRANCH}/scripts/oci/install-docker-oracle-linux.sh" -o "$INSTALL_DOCKER"
+  bash "$INSTALL_DOCKER"
+  rm -f "$INSTALL_DOCKER"
+  echo "==> Run: newgrp docker   (then re-run this script if docker ps fails)"
+  if ! groups | grep -q docker; then
+    exec sg docker -c "PUBLIC_IP=${PUBLIC_IP} bash $0"
+  fi
 fi
 
 if ! command -v docker >/dev/null 2>&1; then
