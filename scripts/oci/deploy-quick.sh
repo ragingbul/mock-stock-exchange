@@ -24,16 +24,19 @@ echo "==> TRADEVERSE quick deploy (Docker pre-installed)"
 echo "    IP: ${PUBLIC_IP}"
 echo "    Dir: ${INSTALL_DIR}"
 
+if ! command -v docker >/dev/null 2>&1 && ! sudo command -v docker >/dev/null 2>&1; then
+  echo "==> Docker not found — installing..."
+  curl -fsSL https://get.docker.com | sudo sh
+  sudo systemctl enable --now docker
+  sudo usermod -aG docker "$(whoami)"
+fi
+
 if ! command -v docker >/dev/null 2>&1; then
   if sudo command -v docker >/dev/null 2>&1; then
-    echo "==> docker found via sudo; using sudo for docker commands"
-    shopt -s expand_aliases
-    alias docker='sudo docker'
+    echo "==> docker available via sudo"
     export DOCKER_SUDO=1
   else
-    echo "ERROR: docker not found. Install Docker first:" >&2
-    echo "  curl -fsSL https://get.docker.com | sudo sh" >&2
-    echo "  sudo usermod -aG docker \$(whoami) && newgrp docker" >&2
+    echo "ERROR: docker install failed" >&2
     exit 1
   fi
 fi
@@ -46,9 +49,14 @@ docker_cmd() {
   fi
 }
 
-if ! docker_cmd compose version >/dev/null 2>&1 && ! docker_cmd-compose version >/dev/null 2>&1; then
-  echo "ERROR: docker compose not found. On Oracle Linux try:" >&2
-  echo "  sudo dnf install -y docker-compose-plugin" >&2
+if ! docker_cmd compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev/null 2>&1; then
+  echo "==> Installing docker compose plugin"
+  sudo dnf install -y docker-compose-plugin 2>/dev/null || \
+    sudo apt-get install -y docker-compose-plugin 2>/dev/null || true
+fi
+
+if ! docker_cmd compose version >/dev/null 2>&1 && ! docker-compose version >/dev/null 2>&1; then
+  echo "ERROR: docker compose not found after install attempt" >&2
   exit 1
 fi
 
@@ -96,7 +104,13 @@ else
 fi
 
 echo "==> Deploy stack"
-./scripts/oci/deploy.sh
+if [[ "${DOCKER_SUDO:-}" == "1" ]]; then
+  # deploy.sh uses plain 'docker compose' — wrap for sudo session
+  export PATH="$PATH:/usr/local/bin"
+  sudo -E env "PATH=$PATH" bash -c "cd '$INSTALL_DIR' && ./scripts/oci/deploy.sh"
+else
+  ./scripts/oci/deploy.sh
+fi
 
 echo "==> Verify"
 ./scripts/oci/verify-deployment.sh || true
