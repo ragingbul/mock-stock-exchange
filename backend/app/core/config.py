@@ -68,6 +68,7 @@ class Settings(BaseSettings):
 
     # Market defaults (used from Phase 1 onward)
     default_starting_capital: float = 1_000_000.0
+    max_position_per_stock: int = Field(default=100, validation_alias="MAX_POSITION_PER_STOCK")
     default_tick_size: float = 0.05
     default_circuit_pct: float = 0.10
     random_seed: int = 42

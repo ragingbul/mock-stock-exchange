@@ -54,6 +54,7 @@ class NewsEvent(Base):
         DateTime(timezone=True), nullable=True, index=True
     )
     is_released: Mapped[bool] = mapped_column(Boolean, default=False)
+    brief_points_json: Mapped[str] = mapped_column(Text, default="[]")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -119,10 +119,12 @@ def _news_direction(payload: dict) -> int:
 def _handle_news(db: Session, event: TimelineEvent, payload: dict) -> dict:
     sector_impacts = payload.get("sector_impacts") or {}
     market_wide = payload.get("market_wide")
+    brief_points = payload.get("brief_points") or []
     news = news_service.create_news(
         db,
         title=event.headline,
         description=event.description or "",
+        brief_points=brief_points,
         sector_impacts=sector_impacts,
         market_wide_impact_pct=market_wide,
         market_wide=market_wide is not None,

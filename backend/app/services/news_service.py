@@ -49,11 +49,14 @@ def create_news(db: Session, **kwargs) -> NewsEvent:
     sector_impacts = kwargs.pop("sector_impacts", None)
     stock_impacts = kwargs.pop("stock_impacts", None)
     market_wide_impact_pct = kwargs.pop("market_wide_impact_pct", None)
+    brief_points = kwargs.pop("brief_points", None)
     status = kwargs.pop("status", None)
     if sector_impacts is not None and not isinstance(sector_impacts, str):
         kwargs["sector_impacts_json"] = json.dumps(sector_impacts)
     if stock_impacts is not None and not isinstance(stock_impacts, str):
         kwargs["stock_impacts_json"] = json.dumps(stock_impacts)
+    if brief_points is not None and not isinstance(brief_points, str):
+        kwargs["brief_points_json"] = json.dumps(brief_points)
     if market_wide_impact_pct is not None:
         kwargs["market_wide_impact_pct"] = Decimal(str(market_wide_impact_pct))
     if status:
@@ -166,10 +169,15 @@ def news_detail_dict(event: NewsEvent) -> dict:
         stock_impacts = json.loads(event.stock_impacts_json or "{}")
     except json.JSONDecodeError:
         stock_impacts = {}
+    try:
+        brief_points = json.loads(event.brief_points_json or "[]")
+    except json.JSONDecodeError:
+        brief_points = []
     return {
         "id": event.id,
         "title": event.title,
         "description": event.description,
+        "brief_points": brief_points,
         "affected_tickers": event.affected_tickers,
         "affected_sectors": event.affected_sectors,
         "market_wide": event.market_wide,

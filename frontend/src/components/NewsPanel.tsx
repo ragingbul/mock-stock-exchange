@@ -1,11 +1,10 @@
 "use client";
 
-import { signClass } from "@/lib/marketFormat";
-
 export type NewsItem = {
   id: number;
   title: string;
   description: string;
+  brief_points?: string[];
   effective_impact?: string;
   released_at?: string;
 };
@@ -47,8 +46,7 @@ export function NewsPanel({ news, selectedNews, onSelectNews }: Props) {
                 className="w-full rounded p-1 text-left hover:bg-neutral-900"
                 onClick={() => onSelectNews(n)}
               >
-                <span className={signClass(n.effective_impact)}>
-                  ●{" "}
+                <span className="text-neutral-500">
                   {n.released_at
                     ? new Date(n.released_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                     : "—"}

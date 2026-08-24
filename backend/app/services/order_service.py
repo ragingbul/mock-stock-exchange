@@ -164,6 +164,13 @@ def submit_order(
         if trader.cash < exec_price * quantity:
             order = reject("insufficient cash")
             raise OrderGatewayError("insufficient cash", rejected_order=order)
+        current_qty = _holding_qty(db, trader_id, stock_id)
+        max_pos = settings.max_position_per_stock
+        if current_qty + quantity > max_pos:
+            order = reject(f"max position is {max_pos} shares per stock")
+            raise OrderGatewayError(
+                f"max position is {max_pos} shares per stock", rejected_order=order
+            )
     else:
         if _holding_qty(db, trader_id, stock_id) < quantity:
             order = reject("insufficient holdings (short selling disabled)")

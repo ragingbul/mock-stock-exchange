@@ -58,6 +58,7 @@ def session_bootstrap(
                 "id": detail["id"],
                 "title": detail["title"],
                 "description": detail.get("description"),
+                "brief_points": detail.get("brief_points") or [],
                 "released_at": detail.get("released_at"),
             }
         )

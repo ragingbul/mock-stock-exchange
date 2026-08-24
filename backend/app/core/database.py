@@ -111,6 +111,7 @@ def _ensure_sqlite_columns(bind: Engine) -> None:
             ("stock_impacts_json", "TEXT DEFAULT '{}'"),
             ("status", "VARCHAR(32) DEFAULT 'draft'"),
             ("baseline_prices_json", "TEXT DEFAULT '{}'"),
+            ("brief_points_json", "TEXT DEFAULT '[]'"),
         ]
         if news_cols:
             for name, decl in alters:

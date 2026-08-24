@@ -1,6 +1,7 @@
 """Order and market-data routes."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -135,13 +136,29 @@ def list_trades(
     trader_id: int | None = None,
     limit: int = 100,
     db: Session = Depends(get_db),
+    trader: Trader = Depends(require_trader),
 ) -> list[TradeRead]:
-    return [
-        TradeRead.model_validate(t)
-        for t in order_service.list_trades(
-            db, stock_id=stock_id, trader_id=trader_id, limit=limit
+    if trader_id is not None and trader_id != trader.id:
+        raise HTTPException(status_code=403, detail="trader_id does not match authenticated session")
+    viewer_id = trader.id
+    trades = order_service.list_trades(
+        db, stock_id=stock_id, trader_id=viewer_id, limit=limit
+    )
+    stock_ids = {t.stock_id for t in trades}
+    tickers: dict[int, str] = {}
+    if stock_ids:
+        for stock in db.scalars(select(Stock).where(Stock.id.in_(stock_ids))).all():
+            tickers[stock.id] = stock.ticker
+    out: list[TradeRead] = []
+    for trade in trades:
+        read = TradeRead.model_validate(trade)
+        side = "buy" if trade.buyer_id == viewer_id else "sell"
+        out.append(
+            read.model_copy(
+                update={"ticker": tickers.get(trade.stock_id), "side": side}
+            )
         )
-    ]
+    return out
 
 
 @router.get("/market/{stock_id}/book", response_model=OrderBookRead)

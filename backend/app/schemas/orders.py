@@ -46,6 +46,8 @@ class TradeRead(BaseModel):
     quantity: int
     price: Decimal
     executed_at: datetime | None = None
+    ticker: str | None = None
+    side: str | None = None  # buy | sell from authenticated trader's perspective
 
 
 class OrderBookRead(BaseModel):
@@ -100,6 +102,7 @@ class NewsRead(BaseModel):
     released_at: datetime | None = None
     scheduled_at: datetime | None = None
     effective_impact: Decimal | None = None
+    brief_points: list[str] | None = None
 
 
 class SessionUpdate(BaseModel):
