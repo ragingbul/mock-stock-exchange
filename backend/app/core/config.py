@@ -48,8 +48,8 @@ class Settings(BaseSettings):
     postgres_port: int = 5432
     postgres_db: str = "mock_stock_exchange"
     database_url_override: str | None = Field(default=None, validation_alias="DATABASE_URL")
-    db_pool_size: int = Field(default=10, validation_alias="DB_POOL_SIZE")
-    db_max_overflow: int = Field(default=20, validation_alias="DB_MAX_OVERFLOW")
+    db_pool_size: int = Field(default=20, validation_alias="DB_POOL_SIZE")
+    db_max_overflow: int = Field(default=40, validation_alias="DB_MAX_OVERFLOW")
     db_pool_recycle: int = Field(default=1800, validation_alias="DB_POOL_RECYCLE")
     db_pool_timeout: int = Field(default=30, validation_alias="DB_POOL_TIMEOUT")
     auto_init_db: bool = Field(default=True, validation_alias="AUTO_INIT_DB")
@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     auth_token_expire_minutes: int = 60 * 12
     admin_token_expire_minutes: int = Field(
         default=60 * 24 * 7, validation_alias="ADMIN_TOKEN_EXPIRE_MINUTES"
+    )
+    simulation_stall_threshold_sec: float = Field(
+        default=20.0, validation_alias="SIMULATION_STALL_THRESHOLD_SEC"
     )
     rate_limit_per_minute: int = Field(default=1200, validation_alias="RATE_LIMIT_PER_MINUTE")
     join_rate_limit_per_minute: int = Field(default=300, validation_alias="JOIN_RATE_LIMIT_PER_MINUTE")

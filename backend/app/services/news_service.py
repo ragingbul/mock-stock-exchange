@@ -84,21 +84,24 @@ def release_news(db: Session, event_id: int, *, now: datetime | None = None) -> 
     event.status = "released"
     snapshot_baselines_on_release(db, event)
     from app.services.news_impact_resolver import compute_stock_impacts_for_news
+    from app.models.news_stock_impact import NewsStockImpact
 
     compute_stock_impacts_for_news(db, event)
 
-    # Optional fair-value nudge from targets (does NOT set LTP)
+    # Fair-value nudge from precomputed impacts (avoid per-stock re-queries).
     stocks = list(
         db.scalars(select(Stock).options(joinedload(Stock.market_sector))).all()
     )
-    from app.services.news_impact_resolver import target_impact_pct_for_stock
-
+    impact_rows = list(
+        db.scalars(select(NewsStockImpact).where(NewsStockImpact.news_event_id == event.id)).all()
+    )
+    impact_by_stock = {row.stock_id: row for row in impact_rows}
     settings = get_settings()
     for stock in stocks:
-        pct = target_impact_pct_for_stock(db, event, stock)
-        if pct is None:
+        row = impact_by_stock.get(stock.id)
+        if row is None:
             continue
-        # Soft fair-value shift toward target (AI trades move LTP)
+        pct = float(row.target_impact_pct)
         factor = Decimal("1") + (
             Decimal(str(pct))
             * Decimal(str(settings.news_fundamental_multiplier))
