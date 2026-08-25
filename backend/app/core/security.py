@@ -19,14 +19,23 @@ _bearer = HTTPBearer(auto_error=False)
 _rate_buckets: dict[str, list[float]] = {}
 
 
-def create_access_token(*, subject: str, role: str = "participant", trader_id: int | None = None) -> str:
+def create_access_token(
+    *,
+    subject: str,
+    role: str = "participant",
+    trader_id: int | None = None,
+    expire_minutes: int | None = None,
+) -> str:
     settings = get_settings()
     now = int(time.time())
+    ttl = expire_minutes
+    if ttl is None:
+        ttl = settings.admin_token_expire_minutes if role == "admin" else settings.auth_token_expire_minutes
     payload = {
         "sub": subject,
         "role": role,
         "iat": now,
-        "exp": now + settings.auth_token_expire_minutes * 60,
+        "exp": now + ttl * 60,
     }
     if trader_id is not None:
         payload["trader_id"] = trader_id
