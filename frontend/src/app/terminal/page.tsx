@@ -22,6 +22,7 @@ import {
   fetchPortfolio,
   fetchSessionBootstrap,
   fetchTrades,
+  isAuthError,
   joinSession,
   mergeTransactions,
   type PortfolioDetail,
@@ -268,12 +269,16 @@ export default function TerminalPage() {
     try {
       const data = await fetchSessionBootstrap();
       applyBootstrap(data);
-    } catch {
-      localStorage.removeItem("mse_access_token");
-      localStorage.removeItem("mse_trader_id");
-      setTraderId(null);
-      setWallet(null);
-      setPortfolio(null);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "";
+      // Only clear session on real auth failures — not timeouts or server errors.
+      if (isAuthError(message)) {
+        localStorage.removeItem("mse_access_token");
+        localStorage.removeItem("mse_trader_id");
+        setTraderId(null);
+        setWallet(null);
+        setPortfolio(null);
+      }
     }
   }, [applyBootstrap]);
 
@@ -329,7 +334,7 @@ export default function TerminalPage() {
       }
     } catch (e) {
       const message = e instanceof Error ? e.message : "";
-      if (message.toLowerCase().includes("401") || message.toLowerCase().includes("unauthor")) {
+      if (isAuthError(message)) {
         localStorage.removeItem("mse_access_token");
         localStorage.removeItem("mse_trader_id");
         setTraderId(null);

@@ -64,6 +64,9 @@ class Settings(BaseSettings):
         validation_alias="ADMIN_SECRET",
     )
     auth_token_expire_minutes: int = 60 * 12
+    admin_token_expire_minutes: int = Field(
+        default=60 * 24 * 7, validation_alias="ADMIN_TOKEN_EXPIRE_MINUTES"
+    )
     rate_limit_per_minute: int = Field(default=1200, validation_alias="RATE_LIMIT_PER_MINUTE")
     join_rate_limit_per_minute: int = Field(default=300, validation_alias="JOIN_RATE_LIMIT_PER_MINUTE")
 

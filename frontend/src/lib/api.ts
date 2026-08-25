@@ -58,13 +58,15 @@ async function fetchWithTimeout(
   input: string,
   init?: RequestInit,
   timeoutMs = REQUEST_TIMEOUT_MS,
+  options?: { skipParticipantAuth?: boolean },
 ): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const participantAuth = options?.skipParticipantAuth ? {} : authHeaders();
   try {
     return await fetch(input, {
       ...init,
-      headers: { ...defaultHeaders(), ...authHeaders(), ...(init?.headers ?? {}) },
+      headers: { ...defaultHeaders(), ...participantAuth, ...(init?.headers ?? {}) },
       signal: controller.signal,
     });
   } catch (e) {
@@ -75,6 +77,17 @@ async function fetchWithTimeout(
   } finally {
     clearTimeout(timer);
   }
+}
+
+export function isAuthError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("401") ||
+    m.includes("403") ||
+    m.includes("unauthor") ||
+    m.includes("invalid or expired token") ||
+    m.includes("trader not found or inactive")
+  );
 }
 
 async function parseError(res: Response): Promise<string> {
@@ -343,14 +356,19 @@ export function getAdminAuthHeaders(): HeadersInit {
 }
 
 export async function adminPost<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetchWithTimeout(apiUrl(path), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...getAdminAuthHeaders(),
+  const res = await fetchWithTimeout(
+    apiUrl(path),
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAdminAuthHeaders(),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+    REQUEST_TIMEOUT_MS,
+    { skipParticipantAuth: true },
+  );
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 }
@@ -367,10 +385,15 @@ export async function adminGet<T>(
     }
     url = `${url}?${qs.toString()}`;
   }
-  const res = await fetchWithTimeout(url, {
-    cache: "no-store",
-    headers: getAdminAuthHeaders(),
-  });
+  const res = await fetchWithTimeout(
+    url,
+    {
+      cache: "no-store",
+      headers: getAdminAuthHeaders(),
+    },
+    REQUEST_TIMEOUT_MS,
+    { skipParticipantAuth: true },
+  );
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 }

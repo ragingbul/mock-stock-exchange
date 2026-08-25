@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { NewsPanel, type NewsItem } from "@/components/NewsPanel";
 import { useMarketWebSocket } from "@/hooks/useMarketWebSocket";
-import { adminGet, adminLogin, adminPost } from "@/lib/api";
+import { adminGet, adminLogin, adminPost, isAuthError } from "@/lib/api";
 
 type SimStatus = {
   status: string;
@@ -69,8 +69,13 @@ export default function AdminPage() {
         setStatus((prev) => mergeStatus(prev, data));
         if (!opts?.quiet) setMsg("");
       } catch (e) {
-        if (!opts?.quiet) {
-          setMsg(e instanceof Error ? e.message : "Failed to load status");
+        const message = e instanceof Error ? e.message : "Failed to load status";
+        if (isAuthError(message)) {
+          window.localStorage.removeItem("mse_admin_token");
+          setAdminToken(null);
+          setMsg("Session expired — please log in again");
+        } else if (!opts?.quiet) {
+          setMsg(message);
         }
       } finally {
         statusInflight.current = false;
@@ -125,7 +130,14 @@ export default function AdminPage() {
         await refreshNews();
       }
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : `${action} failed`);
+      const message = e instanceof Error ? e.message : `${action} failed`;
+      if (isAuthError(message)) {
+        window.localStorage.removeItem("mse_admin_token");
+        setAdminToken(null);
+        setMsg("Session expired — please log in again");
+      } else {
+        setMsg(message);
+      }
     } finally {
       setBusy(false);
     }
