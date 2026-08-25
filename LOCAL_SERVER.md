@@ -1,8 +1,11 @@
-# TRADEVERSE Local LAN Server
+# TRADEVERSE Local Server (Docker + optional ngrok)
 
-Run TRADEVERSE on your **laptop** as the event server. Participants on the same Wi‑Fi connect via your LAN IP. **No cloud, no HTTPS** for this mode.
+Run TRADEVERSE on your **laptop** with Docker. Participants can join via:
 
-Oracle cloud files ([`OCI_DEPLOYMENT.md`](OCI_DEPLOYMENT.md), [`docker-compose.prod.yml`](docker-compose.prod.yml)) remain available but are **not used** in local mode.
+1. **Same Wi‑Fi (LAN)** — `http://YOUR_LAN_IP/...`
+2. **Internet (ngrok)** — `https://….ngrok-free.dev/...` so people off your network can join
+
+Oracle cloud files ([`OCI_DEPLOYMENT.md`](OCI_DEPLOYMENT.md), [`docker-compose.prod.yml`](docker-compose.prod.yml)) are **not used** in local mode.
 
 ---
 
@@ -10,67 +13,49 @@ Oracle cloud files ([`OCI_DEPLOYMENT.md`](OCI_DEPLOYMENT.md), [`docker-compose.p
 
 ```
 YOUR LAPTOP (Docker)
-├── nginx          → only service exposed on host :80
+├── nginx          → only service exposed on host :80  ← ngrok points here
 ├── frontend       → internal :3000
 ├── backend        → internal :8000, 1 uvicorn worker, 1 sim worker
 └── postgres       → internal, persistent volume
 ```
 
-WebSockets: `ws://<host>/api/v1/ws` proxied through nginx.
+WebSockets: `ws://` (LAN) or `wss://` (ngrok HTTPS) at `/api/v1/ws`, proxied through nginx.
+
+---
+
+## Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) running (WSL2 backend OK on Windows)
+- [ngrok](https://ngrok.com/download) installed **only if** you want to share outside your LAN
+  - One-time: `ngrok config add-authtoken <your-token>` from the ngrok dashboard
 
 ---
 
 ## Quick start (Windows)
 
-### 1. Configure environment
+### 1. Create `.env`
+
+From the repo root:
 
 ```powershell
-cd "C:\Users\Slim 5\mock market simulation"
-copy .env.local.example .env
-# Edit .env: set POSTGRES_PASSWORD, JWT_SECRET (32+ chars), ADMIN_SECRET
-# Add your LAN IP to CORS_ORIGINS, FRONTEND_URL, BACKEND_URL
+.\scripts\local\setup-env.ps1
 ```
 
-Find your LAN IP:
+That copies [`.env.local.example`](.env.local.example), generates secrets, and prints `ADMIN_SECRET` (save it for `/admin`).
 
-```powershell
-ipconfig
-```
+Leave `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` **empty** — same-origin auto works for localhost, LAN, and ngrok.
 
-Look for **IPv4 Address** under your Wi‑Fi adapter (e.g. `192.168.1.42`).
-
-Update `.env`:
-
-```
-CORS_ORIGINS=http://localhost,http://127.0.0.1,http://192.168.1.42
-FRONTEND_URL=http://192.168.1.42
-BACKEND_URL=http://192.168.1.42
-```
-
-Leave `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` **empty** for same-origin auto (works for both `localhost` and LAN IP).
-
-### 2. Start
+### 2. Start Docker stack
 
 ```powershell
 .\scripts\local\start.ps1
 ```
 
-Or manually:
-
-```powershell
-docker compose -f docker-compose.local.yml build
-docker compose -f docker-compose.local.yml up -d postgres
-docker compose -f docker-compose.local.yml run --rm backend alembic upgrade head
-docker compose -f docker-compose.local.yml up -d
-```
-
-### 3. Verify on laptop
+First run builds images (can take several minutes). Then verify:
 
 ```powershell
 .\scripts\local\health-check.ps1
 ```
-
-Open in browser:
 
 | Page | URL |
 |------|-----|
@@ -79,6 +64,30 @@ Open in browser:
 | Admin | http://localhost/admin |
 | Market screen | http://localhost/market-screen |
 | Health | http://localhost/api/v1/health |
+
+### 3. Share over the internet (ngrok)
+
+With the stack healthy:
+
+```powershell
+.\scripts\local\share.ps1
+```
+
+This starts `ngrok http 80` (if needed), reads the public HTTPS URL, writes it into `.env` (`CORS_ORIGINS`, `FRONTEND_URL`, `BACKEND_URL`), and restarts backend + nginx.
+
+Share the printed links (example):
+
+| Role | URL |
+|------|-----|
+| Participant | `https://….ngrok-free.dev/terminal` |
+| Admin | `https://….ngrok-free.dev/admin` |
+| Public screen | `https://….ngrok-free.dev/market-screen` |
+
+**Notes**
+
+- Free ngrok shows a one-time browser interstitial; the app sends `ngrok-skip-browser-warning` on API calls.
+- If the ngrok URL changes, run `share.ps1` again (or `.\scripts\local\apply-public-url.ps1 https://NEW-URL`).
+- Keep the laptop awake; do not close Docker or the ngrok process during the event.
 
 ### 4. Stop
 
@@ -90,9 +99,39 @@ Database volume `postgres_data_local` is **preserved**.
 
 ---
 
-## LAN participant URLs
+## Quick start (macOS / Linux)
 
-Replace `192.168.x.x` with your laptop IP:
+```bash
+./scripts/local/setup-env.sh
+./scripts/local/start.sh
+./scripts/local/health-check.sh
+./scripts/local/share.sh          # optional: internet via ngrok
+./scripts/local/stop.sh
+```
+
+---
+
+## LAN only (same Wi‑Fi, no ngrok)
+
+Find your LAN IP (`ipconfig` on Windows → IPv4 under Wi‑Fi), then:
+
+```powershell
+.\scripts\local\apply-public-url.ps1 http://192.168.1.42
+```
+
+Or edit `.env` manually:
+
+```
+CORS_ORIGINS=http://localhost,http://127.0.0.1,http://192.168.1.42
+FRONTEND_URL=http://192.168.1.42
+BACKEND_URL=http://192.168.1.42
+```
+
+Then restart backend:
+
+```powershell
+docker compose -f docker-compose.local.yml restart backend
+```
 
 | Role | URL |
 |------|-----|
@@ -100,11 +139,9 @@ Replace `192.168.x.x` with your laptop IP:
 | Admin | http://192.168.x.x/admin |
 | Public screen | http://192.168.x.x/market-screen |
 
----
+### Windows Firewall
 
-## Windows Firewall
-
-Allow inbound **TCP port 80** on your Private network profile so phones/laptops on the same Wi‑Fi can connect:
+Allow inbound **TCP port 80** on your Private network profile:
 
 1. Windows Security → Firewall & network protection → Advanced settings
 2. Inbound Rules → New Rule → Port → TCP 80 → Allow → Private networks
@@ -113,15 +150,24 @@ Do **not** open 5432, 8000, or 3000.
 
 ---
 
-## CORS when LAN IP changes
-
-If you switch networks and your IP changes:
-
-1. Update `CORS_ORIGINS`, `FRONTEND_URL`, `BACKEND_URL` in `.env`
-2. Restart backend only:
+## Manual Docker commands
 
 ```powershell
-docker compose -f docker-compose.local.yml restart backend
+docker compose -f docker-compose.local.yml build
+docker compose -f docker-compose.local.yml up -d postgres
+docker compose -f docker-compose.local.yml run --rm backend alembic upgrade head
+docker compose -f docker-compose.local.yml up -d
+```
+
+---
+
+## CORS when URL / LAN IP changes
+
+1. Prefer `.\scripts\local\apply-public-url.ps1 <url>` (or `share.ps1` for ngrok)
+2. Or edit `CORS_ORIGINS`, `FRONTEND_URL`, `BACKEND_URL` in `.env`, then:
+
+```powershell
+docker compose -f docker-compose.local.yml restart backend nginx
 ```
 
 Frontend rebuild is **not** required (same-origin API resolution).
@@ -201,10 +247,13 @@ docker compose -f docker-compose.local.yml logs -f frontend
 
 | File | Purpose |
 |------|---------|
-| [`docker-compose.local.yml`](docker-compose.local.yml) | Local LAN stack |
+| [`docker-compose.local.yml`](docker-compose.local.yml) | Local LAN / ngrok stack |
 | [`nginx/conf.d/tradeverse.local.conf`](nginx/conf.d/tradeverse.local.conf) | HTTP nginx routes |
 | [`.env.local.example`](.env.local.example) | Env template |
+| [`scripts/local/setup-env.ps1`](scripts/local/setup-env.ps1) | Create `.env` + secrets |
 | [`scripts/local/start.ps1`](scripts/local/start.ps1) | Start stack |
+| [`scripts/local/share.ps1`](scripts/local/share.ps1) | ngrok tunnel + CORS wiring |
+| [`scripts/local/apply-public-url.ps1`](scripts/local/apply-public-url.ps1) | Set public/LAN URL in `.env` |
 
 ---
 

@@ -61,7 +61,23 @@ If the order cannot fill, you get a short human-readable reason — not matching
 
 ## For hosts
 
-### Quick start
+### Quick start (Docker + share via ngrok)
+
+Recommended for events / multiplayer. Full guide: [`LOCAL_SERVER.md`](LOCAL_SERVER.md).
+
+```powershell
+.\scripts\local\setup-env.ps1
+.\scripts\local\start.ps1
+.\scripts\local\share.ps1    # optional: public HTTPS URL via ngrok
+```
+
+| Page | URL |
+|------|-----|
+| Trading terminal | http://localhost/terminal |
+| Admin | http://localhost/admin |
+| Health | http://localhost/api/v1/health |
+
+### Quick start (dev without Docker)
 
 ```bash
 cp .env.example .env
