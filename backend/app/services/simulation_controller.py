@@ -221,6 +221,7 @@ def reset_simulation(db: Session) -> dict:
         state.paused_at_real = None
 
         sim_settings = get_or_create_settings(db)
+        sim_settings.simulation_ai_enabled = get_settings().simulation_ai_enabled
         state.sim_duration_sec = float(sim_settings.sim_duration_sec or 10800)
 
         from app.services.simulation_settings_service import sync_runtime_speed_from_settings

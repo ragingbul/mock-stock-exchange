@@ -42,4 +42,5 @@ echo
 
 echo "=== Done ==="
 echo "If health failed: docker compose -f docker-compose.prod.yml restart backend nginx"
+echo "If logs show QueuePool limit: deploy latest (pool fix) then restart backend"
 echo "If sim frozen: admin STOP then START, or RESET before go-live"

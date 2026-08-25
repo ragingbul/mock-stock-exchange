@@ -3,6 +3,7 @@ import type { LeaderboardRow } from "@/components/Leaderboard";
 
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
 const REQUEST_TIMEOUT_MS = 30_000;
+const ADMIN_REQUEST_TIMEOUT_MS = 60_000;
 
 function defaultHeaders(): HeadersInit {
   const headers: Record<string, string> = {};
@@ -366,7 +367,7 @@ export async function adminPost<T>(path: string, body?: unknown): Promise<T> {
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     },
-    REQUEST_TIMEOUT_MS,
+    ADMIN_REQUEST_TIMEOUT_MS,
     { skipParticipantAuth: true },
   );
   if (!res.ok) throw new Error(await parseError(res));
@@ -391,7 +392,7 @@ export async function adminGet<T>(
       cache: "no-store",
       headers: getAdminAuthHeaders(),
     },
-    REQUEST_TIMEOUT_MS,
+    ADMIN_REQUEST_TIMEOUT_MS,
     { skipParticipantAuth: true },
   );
   if (!res.ok) throw new Error(await parseError(res));

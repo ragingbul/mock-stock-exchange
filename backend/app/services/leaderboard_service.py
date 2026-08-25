@@ -12,7 +12,7 @@ from app.models import LeaderboardSnapshot, Trade, Trader, TraderType
 from app.services.portfolio_service import get_portfolio
 
 _leaderboard_cache: tuple[float, list[dict]] | None = None
-LEADERBOARD_CACHE_SEC = 5.0
+LEADERBOARD_CACHE_SEC = 30.0
 
 
 def invalidate_leaderboard_cache() -> None:
