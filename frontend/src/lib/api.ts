@@ -39,7 +39,9 @@ export function apiUrl(path: string): string {
 
 export function wsUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_WS_URL?.replace(/\/$/, "");
-  const base = explicit ?? getApiBaseUrl().replace(/^http/, "ws");
+  const base =
+    explicit ??
+    getApiBaseUrl().replace(/^https:/, "wss:").replace(/^http:/, "ws:");
   const path = `${base}${API_PREFIX}/ws`;
   if (typeof window === "undefined") return path;
   const token = window.localStorage.getItem("mse_access_token");

@@ -32,7 +32,12 @@ Write-Host ""
 Write-Host "TRADEVERSE is running."
 Write-Host "  Localhost:  http://localhost/terminal"
 Write-Host "  LAN:        http://YOUR_LAN_IP/terminal  (find IP: ipconfig)"
+$frontendUrl = (Get-Content .env | Where-Object { $_ -match '^FRONTEND_URL=' } | ForEach-Object { $_ -replace '^FRONTEND_URL=', '' }).Trim()
+if ($frontendUrl -like "https://*") {
+    Write-Host "  ngrok:      $frontendUrl/terminal"
+}
 Write-Host "  Admin:      http://localhost/admin"
 Write-Host "  Health:     http://localhost/api/v1/health"
 Write-Host ""
+Write-Host "For ngrok: run 'ngrok http 80' in another terminal (tunnel must point to port 80)."
 Write-Host "Run scripts/local/health-check.ps1 to verify."

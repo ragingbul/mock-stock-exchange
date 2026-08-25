@@ -113,6 +113,63 @@ Do **not** open 5432, 8000, or 3000.
 
 ---
 
+## ngrok (public internet access)
+
+Expose your local stack (nginx on **port 80**) via ngrok so participants outside your LAN can connect.
+
+### 1. Start the Docker stack first
+
+```powershell
+.\scripts\local\start.ps1
+```
+
+Verify http://localhost/api/v1/health returns OK.
+
+### 2. Start ngrok (separate terminal)
+
+```powershell
+ngrok http 80
+```
+
+Example tunnel: `https://module-coziness-unwitting.ngrok-free.dev` → `http://localhost:80`
+
+### 3. Configure `.env`
+
+Set your ngrok URL in `.env` (see [`.env.local.example`](.env.local.example)):
+
+```
+CORS_ORIGINS=http://localhost,http://127.0.0.1,https://module-coziness-unwitting.ngrok-free.dev
+FRONTEND_URL=https://module-coziness-unwitting.ngrok-free.dev
+BACKEND_URL=https://module-coziness-unwitting.ngrok-free.dev
+```
+
+Leave `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` **empty** — the frontend uses same-origin automatically.
+
+Restart backend + nginx after changing `.env`:
+
+```powershell
+docker compose -f docker-compose.local.yml restart backend nginx
+```
+
+If you changed frontend env vars, rebuild: `docker compose -f docker-compose.local.yml up -d --build frontend`
+
+### 4. Participant URLs
+
+| Role | URL |
+|------|-----|
+| Participant | https://module-coziness-unwitting.ngrok-free.dev/terminal |
+| Admin | https://module-coziness-unwitting.ngrok-free.dev/admin |
+| Public screen | https://module-coziness-unwitting.ngrok-free.dev/market-screen |
+| Health | https://module-coziness-unwitting.ngrok-free.dev/api/v1/health |
+
+### Notes
+
+- ngrok free tier shows a browser warning page once; the app sends `ngrok-skip-browser-warning` on API calls.
+- WebSockets use `wss://` automatically when the page is loaded over HTTPS.
+- If your ngrok URL changes, update `CORS_ORIGINS`, `FRONTEND_URL`, and `BACKEND_URL`, then restart backend.
+
+---
+
 ## CORS when LAN IP changes
 
 If you switch networks and your IP changes:
